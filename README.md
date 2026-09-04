@@ -34,12 +34,12 @@ LODはpoint columnではありません。levelは物理的に連続し、Row Gr
 
 ## セットアップ
 
-Rust 1.85以上、Node.js 22以上、npmが必要です。DuckDB検証には `duckdb` CLIも必要です。
+Rust 1.85以上、Node.js 24以上、pnpm 12が必要です。DuckDB検証には `duckdb` CLIも必要です。依存パッケージには公開後7日間のcooldownを設定しています。
 
 ```sh
-npm install
+pnpm install
 cargo build --release --workspace
-npm run build
+pnpm build
 ```
 
 ## 変換
@@ -93,11 +93,11 @@ LOD範囲は汎用SQL column filterではなく、`point_cloud.level_row_group_e
 Range serverとViteを別々のterminalで起動します。デモはデフォルトで `114112.parquet` を開き、最も粗いL0をRGB表示します。
 
 ```sh
-npm run serve -- . 8080
+pnpm serve -- . 8080
 ```
 
 ```sh
-npm run dev:viewer
+pnpm dev:viewer
 ```
 
 表示されたURLをブラウザで開きます。point size、RGB/elevation/LOD色、level/Row Group bboxを変更でき、実際のRange転送量、request数、候補・除外Row Group数、decode時間を画面上で確認できます。各bboxはParquetのXYZ column statisticsから構築します。
@@ -115,7 +115,7 @@ HyparquetのRange fetch、ZSTD decode、row filter、座標復元、color buffer
 ZSTD decodeには `hyparquet-compressors` を同梱しています。ストレージ側は `Range` と `HEAD` に対応し、`Content-Length`, `Content-Range`, `Accept-Ranges` をCORSで公開する必要があります。ローカル確認用サーバーは次で起動できます。
 
 ```sh
-npm run serve -- . 8080
+pnpm serve -- . 8080
 ```
 
 ```ts
@@ -139,8 +139,8 @@ console.log(result.metrics);
 
 ```sh
 cargo test --workspace
-npm run typecheck
-npm test
+pnpm typecheck
+pnpm test
 ```
 
 ## PoC上の制約

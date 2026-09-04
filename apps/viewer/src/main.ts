@@ -78,7 +78,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
             <legend>Spatial bounds</legend>
             <div class="segmented two-up" id="bbox-mode">
               <label><input id="show-level-bounds" type="checkbox"><span>Level bbox</span></label>
-              <label><input id="show-row-group-bounds" type="checkbox" checked><span>Row Groups</span></label>
+              <label><input id="show-row-group-bounds" type="checkbox"><span>Row Groups</span></label>
             </div>
             <small class="bbox-legend">Bright: selected · Faint: available</small>
           </fieldset>

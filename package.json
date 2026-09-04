@@ -2,13 +2,20 @@
   "name": "pointcloud-parquet",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/viewer", "packages/*"],
-  "scripts": {
-    "build": "npm run build --workspace @pointcloud-parquet/browser && npm run build --workspace @pointcloud-parquet/viewer",
-    "dev:viewer": "npm run build --workspace @pointcloud-parquet/browser && npm run dev --workspace @pointcloud-parquet/viewer",
-    "serve": "node scripts/range-server.mjs",
-    "test": "npm run build --workspace @pointcloud-parquet/browser && npm run test --workspaces --if-present",
-    "typecheck": "npm run build --workspace @pointcloud-parquet/browser && npm run typecheck --workspaces --if-present"
+  "packageManager": "pnpm@12.1.0",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "error"
+    }
   },
-  "engines": { "node": ">=22" }
+  "scripts": {
+    "build": "pnpm --filter @pointcloud-parquet/browser build && pnpm --filter @pointcloud-parquet/viewer build",
+    "dev:viewer": "pnpm --filter @pointcloud-parquet/browser build && pnpm --filter @pointcloud-parquet/viewer dev",
+    "serve": "node scripts/range-server.mjs",
+    "test": "pnpm --filter @pointcloud-parquet/browser build && pnpm --recursive --if-present test",
+    "typecheck": "pnpm --filter @pointcloud-parquet/browser build && pnpm --recursive --if-present typecheck"
+  },
+  "engines": { "node": "24.x" }
 }

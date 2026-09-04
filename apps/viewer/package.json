@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@pointcloud-parquet/browser": "0.1.0",
+    "@pointcloud-parquet/browser": "workspace:*",
     "three": "0.185.1"
   },
   "devDependencies": {
