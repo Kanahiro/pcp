@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{IntegerBounds, Point};
 
@@ -80,13 +80,32 @@ pub fn build_levels(
         } else {
             let exponent = u32::from(levels - 1 - resolution);
             let voxel_width = voxel_width(ratio, exponent);
-            let mut occupied = HashSet::new();
-            for slot in &mut remaining {
+            let mut representatives = HashMap::new();
+            for (index, slot) in remaining.iter().enumerate() {
                 let Some(point) = *slot else { continue };
                 let voxel = voxel_for(point, bounds.min, voxel_width);
-                if occupied.insert(voxel) {
+                let candidate = (
+                    representative_priority(point, exponent),
+                    point.source_index,
+                    index,
+                );
+                representatives
+                    .entry(voxel)
+                    .and_modify(|current| {
+                        if candidate < *current {
+                            *current = candidate;
+                        }
+                    })
+                    .or_insert(candidate);
+            }
+            let mut selected_indices: Vec<_> = representatives
+                .into_values()
+                .map(|(_, _, index)| index)
+                .collect();
+            selected_indices.sort_unstable();
+            for index in selected_indices {
+                if let Some(point) = remaining[index].take() {
                     selected.push(point);
-                    *slot = None;
                 }
             }
         }
@@ -97,6 +116,24 @@ pub fn build_levels(
         });
     }
     output
+}
+
+/// A stable pseudo-random rank prevents source/COPC ordering from biasing every
+/// representative toward the same part of its voxel. The exponent salt keeps
+/// adjacent hierarchy levels from repeating the same spatial preference.
+fn representative_priority(point: Point, exponent: u32) -> u64 {
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ u64::from(exponent);
+    for value in [point.x, point.y, point.z] {
+        state = splitmix64(state ^ u64::from(value as u32));
+    }
+    state
+}
+
+fn splitmix64(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
 }
 
 fn voxel_width(ratio: u32, exponent: u32) -> u64 {
@@ -274,5 +311,36 @@ mod tests {
         assert_eq!(2, levels.len());
         assert_eq!(1, levels[0].points.len());
         assert_eq!(2, levels[1].points.len());
+    }
+
+    #[test]
+    fn representative_choice_does_not_depend_on_input_order() {
+        let points: Vec<_> = (0..32)
+            .map(|x| Point {
+                x,
+                y: x * 3,
+                z: x * 5,
+                source_index: x as u32,
+            })
+            .collect();
+        let bounds = IntegerBounds::from_points(&points).unwrap();
+        let mut reversed = points.clone();
+        reversed.reverse();
+
+        let forward = build_levels(points, 2, 64, bounds);
+        let backward = build_levels(reversed, 2, 64, bounds);
+        let forward_ids: HashSet<_> = forward[0]
+            .points
+            .iter()
+            .map(|point| point.source_index)
+            .collect();
+        let backward_ids: HashSet<_> = backward[0]
+            .points
+            .iter()
+            .map(|point| point.source_index)
+            .collect();
+
+        assert_eq!(forward_ids, backward_ids);
+        assert_ne!(HashSet::from([0]), forward_ids);
     }
 }

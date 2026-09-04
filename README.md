@@ -157,6 +157,6 @@ pnpm test
 - 変換時はXYZをメモリに全件保持します。巨大データ向け外部sortは未実装です。
 - STRは各resolution内をX/Y/Zの順に分割してRow Group境界へ揃え、各Row Group内でも同じ処理をdata page境界へ適用します。Row Groupとpageの両方でbbox pruningを利用できます。
 - STRはRow Groupの3D bbox体積を小さくする一方、特定軸の全域を含む平面的なqueryでは空間曲線より候補数が増える場合があります。比較時は3D boxとXY boxを分けて計測します。
-- LOD代表点は入力順に依存します。見た目や密度を最適化するアルゴリズムではありません。
+- LOD代表点は座標とlevelから得る決定的ハッシュでvoxel内から選びます。入力順の空間的偏りは避けますが、blue-noise samplingのように点間距離を最適化するものではありません。
 - 独自index、VLR/EVLRコンテナの複製、COPC生成/decoderは対象外です。
 - `rowGroupsRead` はfooter statisticsから求めた安全側の候補数です。HTTPの物理request数とは `rangeRequests` を区別しています。

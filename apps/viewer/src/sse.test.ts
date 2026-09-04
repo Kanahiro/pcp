@@ -85,6 +85,20 @@ describe("selectRowGroupsBySse", () => {
     expect(selection.selectedPointCount).toBe(30);
   });
 
+  it("accepts a zero-pixel threshold as maximum refinement", () => {
+    const selection = selectRowGroupsBySse(
+      rowGroups,
+      resolutions,
+      bounds,
+      [5, 5, 1000],
+      1000,
+      90,
+      0,
+      100,
+    );
+    expect(selection.rowGroupIndices).toEqual([0, 1, 2]);
+  });
+
   it("keeps every Row Group containing the camera even beyond the point budget", () => {
     const groups = [
       rowGroups[0]!,

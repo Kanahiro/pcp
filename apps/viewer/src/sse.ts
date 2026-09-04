@@ -24,8 +24,8 @@ export function selectRowGroupsBySse(
   pointBudget: number,
 ): SpatialSseSelection {
   if (resolutions.length === 0) throw new RangeError("at least one resolution is required");
-  if (!(viewportHeight > 0 && verticalFovDegrees > 0 && pixelThreshold > 0 && pointBudget > 0)) {
-    throw new RangeError("SSE camera parameters must be positive");
+  if (!(viewportHeight > 0 && verticalFovDegrees > 0 && pixelThreshold >= 0 && pointBudget > 0)) {
+    throw new RangeError("SSE camera parameters must be positive and the pixel threshold non-negative");
   }
   const pixelScale = viewportHeight / (2 * Math.tan(verticalFovDegrees * Math.PI / 360));
   const candidates: Array<{
@@ -110,4 +110,3 @@ function boundsContainPoint(
   return point.every((coordinate, axis) =>
     coordinate >= bounds.min[axis]! && coordinate <= bounds.max[axis]!);
 }
-
