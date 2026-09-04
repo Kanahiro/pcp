@@ -50,12 +50,14 @@ cargo run --release -p pcp-convert -- \
   --coarse-points 8192 \
   --row-group-size 65536 \
   --page-row-count 8192 \
-  --zstd-level 3
+  --zstd-level 9
 ```
 
 resolutionを決定した後、各levelをRow Group容量を葉サイズとする3次元STR（X slab → Y tile → Z order）で独立にpackします。保存するXYZは元のLAS量子化整数のままです。
 
-XYZとintensityには `DELTA_BINARY_PACKED`、GPS timeには `BYTE_STREAM_SPLIT` を明示します。RGBやscan angleなど、実測でdictionaryの方が小さかった列はwriterのdictionary encodingを維持します。全列の後段圧縮はZSTDです。
+XYZとintensityには `DELTA_BINARY_PACKED`、GPS timeには `BYTE_STREAM_SPLIT` を明示します。RGBやscan angleなど、実測でdictionaryの方が小さかった列はwriterのdictionary encodingを維持します。全列の後段圧縮はZSTD level 9です。圧縮パラメータの比較根拠と測定条件は [圧縮・ストリーミング比較](benchmarks/compression-study.md) にまとめています。
+
+`--page-order` はSTRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
 
 `--base-voxel-size` は入力と同じ実座標単位（通常はm）です。省略時はLASの3軸scaleの最大値を最細候補に使います。`--levels` も省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小の2のべき乗voxelを選び、辺長をlevelごとに1/2へ下げます。したがって巨大なroot voxelの1点から始めず、最初の表示に使える数千点から開始できます。各voxelで入力順の最初の未採用点を選び、全点は重複も欠落もなくちょうど1 levelへ所属します。比較実験ではこれらのoptionを明示してladderを固定できます。
 
@@ -93,7 +95,7 @@ LOD範囲は汎用SQL column filterではなく、`point_cloud.level_row_group_e
 Range serverとViteを別々のterminalで起動します。デモはデフォルトで `114112.parquet` を開き、最も粗いL0をRGB表示します。
 
 ```sh
-pnpm serve -- . 8080
+pnpm serve . 8080
 ```
 
 ```sh
@@ -115,7 +117,7 @@ HyparquetのRange fetch、ZSTD decode、row filter、座標復元、color buffer
 ZSTD decodeには `hyparquet-compressors` を同梱しています。ストレージ側は `Range` と `HEAD` に対応し、`Content-Length`, `Content-Range`, `Accept-Ranges` をCORSで公開する必要があります。ローカル確認用サーバーは次で起動できます。
 
 ```sh
-pnpm serve -- . 8080
+pnpm serve . 8080
 ```
 
 ```ts

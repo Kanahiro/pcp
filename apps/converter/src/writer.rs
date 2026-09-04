@@ -19,6 +19,23 @@ use crate::{
     metadata::{PointCloudMetadata, build_level_row_group_ends},
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IntensityEncoding {
+    Delta,
+    Dictionary,
+    Plain,
+}
+
+impl IntensityEncoding {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Delta => "delta",
+            Self::Dictionary => "dictionary",
+            Self::Plain => "plain",
+        }
+    }
+}
+
 pub fn write_parquet(
     path: &Path,
     levels: &[Level],
@@ -27,6 +44,7 @@ pub fn write_parquet(
     row_group_size: usize,
     page_row_count: usize,
     zstd_level: i32,
+    intensity_encoding: IntensityEncoding,
 ) -> Result<()> {
     ensure!(
         metadata.level_row_group_ends
@@ -81,12 +99,22 @@ pub fn write_parquet(
         )]));
     // STR packing bounds the coordinate ranges within each Row Group. Explicit
     // delta encoding then exposes the remaining local similarity to ZSTD.
-    for column in ["x", "y", "z", "intensity", "waveform_data_offset"] {
+    for column in ["x", "y", "z", "waveform_data_offset"] {
         let path = ColumnPath::from(column);
         properties = properties
             .set_column_dictionary_enabled(path.clone(), false)
             .set_column_encoding(path, Encoding::DELTA_BINARY_PACKED);
     }
+    let intensity = ColumnPath::from("intensity");
+    properties = match intensity_encoding {
+        IntensityEncoding::Delta => properties
+            .set_column_dictionary_enabled(intensity.clone(), false)
+            .set_column_encoding(intensity, Encoding::DELTA_BINARY_PACKED),
+        IntensityEncoding::Dictionary => properties.set_column_dictionary_enabled(intensity, true),
+        IntensityEncoding::Plain => properties
+            .set_column_dictionary_enabled(intensity.clone(), false)
+            .set_column_encoding(intensity, Encoding::PLAIN),
+    };
     let gps_time = ColumnPath::from("gps_time");
     properties = properties
         .set_column_dictionary_enabled(gps_time.clone(), false)
@@ -359,6 +387,7 @@ mod tests {
             2,
             2,
             3,
+            IntensityEncoding::Delta,
         )
         .unwrap();
 

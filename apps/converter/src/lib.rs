@@ -1,6 +1,7 @@
 pub mod attributes;
 pub mod hierarchy;
 pub mod metadata;
+pub mod page_order;
 pub mod str;
 pub mod writer;
 

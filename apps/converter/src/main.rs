@@ -1,15 +1,16 @@
 use std::{path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result, bail};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use las::Reader;
 use pcp_convert::{
     IntegerBounds,
     attributes::LasAttributes,
     hierarchy::{automatic_level_count_for_target, build_levels, coarsest_voxel_size},
     metadata::{PointCloudMetadata, SourceLasMetadata, build_level_row_group_ends},
+    page_order::{PageOrder, reorder_pages},
     str::pack_levels,
-    writer::write_parquet,
+    writer::{IntensityEncoding, write_parquet},
 };
 use serde::Serialize;
 
@@ -36,9 +37,51 @@ struct Args {
     /// Maximum rows per Parquet data page. Smaller pages improve bbox pruning.
     #[arg(long, default_value_t = 8_192)]
     page_row_count: usize,
+    /// Ordering applied within each data page after STR fixes its spatial membership.
+    #[arg(long, value_enum, default_value_t = PageOrderArg::Spatial)]
+    page_order: PageOrderArg,
+    /// Parquet encoding used for the intensity column.
+    #[arg(long, value_enum, default_value_t = IntensityEncodingArg::Delta)]
+    intensity_encoding: IntensityEncodingArg,
     /// ZSTD compression level accepted by parquet-rs (-7 through 22).
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 9)]
     zstd_level: i32,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum PageOrderArg {
+    Spatial,
+    Hilbert,
+    Source,
+    GpsTime,
+}
+
+impl From<PageOrderArg> for PageOrder {
+    fn from(value: PageOrderArg) -> Self {
+        match value {
+            PageOrderArg::Spatial => Self::Spatial,
+            PageOrderArg::Hilbert => Self::Hilbert,
+            PageOrderArg::Source => Self::Source,
+            PageOrderArg::GpsTime => Self::GpsTime,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum IntensityEncodingArg {
+    Delta,
+    Dictionary,
+    Plain,
+}
+
+impl From<IntensityEncodingArg> for IntensityEncoding {
+    fn from(value: IntensityEncodingArg) -> Self {
+        match value {
+            IntensityEncodingArg::Delta => Self::Delta,
+            IntensityEncodingArg::Dictionary => Self::Dictionary,
+            IntensityEncodingArg::Plain => Self::Plain,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -48,6 +91,9 @@ struct Summary {
     bytes_per_point: f64,
     row_group_size: usize,
     page_row_count: usize,
+    page_order: &'static str,
+    intensity_encoding: &'static str,
+    zstd_level: i32,
     coarse_points: usize,
     base_voxel_size: f64,
     coarsest_voxel_size: f64,
@@ -107,6 +153,14 @@ fn main() -> Result<()> {
         integer_bounds,
     );
     pack_levels(&mut levels, args.row_group_size);
+    let page_order = PageOrder::from(args.page_order);
+    reorder_pages(
+        &mut levels,
+        &attributes,
+        args.row_group_size,
+        args.page_row_count,
+        page_order,
+    )?;
     let level_points: Vec<_> = levels.iter().map(|level| level.points.len()).collect();
     let metadata = PointCloudMetadata {
         version: "0.1.0".to_owned(),
@@ -131,7 +185,11 @@ fn main() -> Result<()> {
         base_voxel_size,
         coarsest_voxel_size,
         hierarchy: "additive_voxel_first".to_owned(),
-        spatial_order: "str_3d_row_group".to_owned(),
+        spatial_order: if page_order == PageOrder::Spatial {
+            "str_3d_row_group".to_owned()
+        } else {
+            format!("str_3d_row_group+{}_page", page_order.name())
+        },
         source_las: SourceLasMetadata {
             point_format: point_format.to_u8()?,
             extra_bytes_per_point: point_format.extra_bytes,
@@ -146,6 +204,7 @@ fn main() -> Result<()> {
         args.row_group_size,
         args.page_row_count,
         args.zstd_level,
+        args.intensity_encoding.into(),
     )?;
 
     let output_bytes = std::fs::metadata(&args.output)?.len();
@@ -156,6 +215,9 @@ fn main() -> Result<()> {
         bytes_per_point: output_bytes as f64 / input_points as f64,
         row_group_size: args.row_group_size,
         page_row_count: args.page_row_count,
+        page_order: page_order.name(),
+        intensity_encoding: IntensityEncoding::from(args.intensity_encoding).name(),
+        zstd_level: args.zstd_level,
         coarse_points: args.coarse_points,
         base_voxel_size,
         coarsest_voxel_size,
