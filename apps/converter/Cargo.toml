@@ -1,0 +1,19 @@
+[package]
+name = "pcp-convert"
+description = "Convert LAS/LAZ point clouds to resolution-ordered, 3D STR-packed Parquet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
+clap.workspace = true
+las.workspace = true
+parquet.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3.23"

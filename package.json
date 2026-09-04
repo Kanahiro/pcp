@@ -1,0 +1,14 @@
+{
+  "name": "pointcloud-parquet",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/viewer", "packages/*"],
+  "scripts": {
+    "build": "npm run build --workspace @pointcloud-parquet/browser && npm run build --workspace @pointcloud-parquet/viewer",
+    "dev:viewer": "npm run build --workspace @pointcloud-parquet/browser && npm run dev --workspace @pointcloud-parquet/viewer",
+    "serve": "node scripts/range-server.mjs",
+    "test": "npm run build --workspace @pointcloud-parquet/browser && npm run test --workspaces --if-present",
+    "typecheck": "npm run build --workspace @pointcloud-parquet/browser && npm run typecheck --workspaces --if-present"
+  },
+  "engines": { "node": ">=22" }
+}
