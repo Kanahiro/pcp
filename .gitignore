@@ -1,8 +1,7 @@
 /target/
-/node_modules/
-/dist/
+**/node_modules/
+**/dist/
 *.parquet
 *.las
 *.laz
 .DS_Store
-
