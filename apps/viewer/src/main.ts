@@ -136,7 +136,6 @@ controls.addEventListener("start", () => viewport.classList.add("is-dragging"));
 const cloudGroup = new THREE.Group();
 scene.add(cloudGroup);
 let renderDirty = true;
-controls.addEventListener("change", requestRender);
 
 const workerClient = new PointCloudWorkerClient();
 let cloud: CloudDescription | null = null;
@@ -148,6 +147,16 @@ let fullBounds: WorldBounds | null = null;
 let isBusy = false;
 let loadedSelectionKey = "";
 let autoLodTimer: ReturnType<typeof setTimeout> | undefined;
+let autoLodPending = false;
+let autoLodImmediate = false;
+let lastAutoLodAt = Number.NEGATIVE_INFINITY;
+
+const AUTO_LOD_INTERVAL_MS = 250;
+
+controls.addEventListener("change", () => {
+  requestRender();
+  scheduleAutomaticLod();
+});
 
 const resizeObserver = new ResizeObserver(resize);
 resizeObserver.observe(viewport);
@@ -198,7 +207,7 @@ fitButton.addEventListener("pointerdown", (event) => event.stopPropagation());
 fitButton.addEventListener("click", fitView);
 controls.addEventListener("end", () => {
   viewport.classList.remove("is-dragging");
-  scheduleAutomaticLod();
+  scheduleAutomaticLod(true);
 });
 
 void openDataset();
@@ -296,7 +305,7 @@ async function queryAndRender(options: {
   } finally {
     if (!nested) {
       setBusy(false);
-      scheduleAutomaticLod();
+      if (autoLodPending) scheduleAutomaticLod(autoLodImmediate);
     }
   }
 }
@@ -498,14 +507,28 @@ function readPointBudget(): number {
     : input.valueAsNumber;
 }
 
-function scheduleAutomaticLod(): void {
+function scheduleAutomaticLod(immediate = false): void {
   if (!element<HTMLInputElement>("auto-lod").checked || !cloud) return;
-  if (autoLodTimer !== undefined) clearTimeout(autoLodTimer);
-  autoLodTimer = setTimeout(() => void applyAutomaticLod(), 220);
+  autoLodPending = true;
+  autoLodImmediate ||= immediate;
+  if (autoLodTimer !== undefined) {
+    if (!autoLodImmediate) return;
+    clearTimeout(autoLodTimer);
+  }
+  const elapsed = performance.now() - lastAutoLodAt;
+  const delay = autoLodImmediate ? 0 : Math.max(0, AUTO_LOD_INTERVAL_MS - elapsed);
+  autoLodTimer = setTimeout(() => {
+    autoLodTimer = undefined;
+    if (!autoLodPending) return;
+    const wasImmediate = autoLodImmediate;
+    autoLodPending = false;
+    autoLodImmediate = false;
+    lastAutoLodAt = performance.now();
+    void applyAutomaticLod(false, wasImmediate);
+  }, delay);
 }
 
-async function applyAutomaticLod(fit = false): Promise<void> {
-  autoLodTimer = undefined;
+async function applyAutomaticLod(fit = false, wasImmediate = false): Promise<void> {
   if (!cloud || !element<HTMLInputElement>("auto-lod").checked) return;
   const cameraWorld: [number, number, number] = [
     camera.position.x + origin[0],
@@ -527,7 +550,10 @@ async function applyAutomaticLod(fit = false): Promise<void> {
   const selectionKey = `groups:${selection.rowGroupIndices.join(",")}:${boundsKey(bounds)}`;
   if (selectionKey === loadedSelectionKey) return;
   if (isBusy) {
-    scheduleAutomaticLod();
+    // Let the in-flight refinement finish and remain visible. Treating camera
+    // motion as cancellation starves loading while OrbitControls is damping.
+    autoLodPending = true;
+    autoLodImmediate ||= wasImmediate;
     return;
   }
   element<HTMLInputElement>("resolution").value = String(selection.maxResolution);
