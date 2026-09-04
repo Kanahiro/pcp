@@ -33,7 +33,6 @@ void main() {
 const FRAGMENT_SHADER = `
 precision highp float;
 
-uniform float opacity;
 uniform vec3 fogColor;
 uniform float fogDensity;
 
@@ -51,7 +50,7 @@ vec3 linearToSrgb(vec3 value) {
 void main() {
   float fogFactor = 1.0 - exp(-fogDensity * fogDensity * fogDepth * fogDepth);
   vec3 color = mix(vertexColor, fogColor, fogFactor);
-  outputColor = vec4(linearToSrgb(color), opacity);
+  outputColor = vec4(linearToSrgb(color), 1.0);
 }
 `;
 
@@ -78,11 +77,9 @@ export class QuantizedPointMaterial extends THREE.RawShaderMaterial {
         offsetFromOrigin: { value: new THREE.Vector3(...offsetFromOrigin) },
         pointSize: { value: pointSize },
         viewportScale: { value: 1 },
-        opacity: { value: 0.96 },
         fogColor: { value: new THREE.Color(0x111315) },
         fogDensity: { value: 0.00032 },
       },
-      transparent: true,
     });
   }
 

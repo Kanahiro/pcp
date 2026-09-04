@@ -125,7 +125,7 @@ scene.background = new THREE.Color(0x111315);
 scene.fog = new THREE.FogExp2(0x111315, 0.00032);
 const camera = new THREE.PerspectiveCamera(43, 1, 0.01, 1_000_000);
 camera.up.set(0, 0, 1);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
 const controls = new OrbitControls(camera, viewport);
