@@ -115,6 +115,10 @@ LODはデフォルトでRow Group単位に自動選択します。各levelのvox
 
 HyparquetのRange fetch、ZSTD decode、row filter、座標復元、color buffer生成は専用Web Workerで実行します。取得済みの圧縮byte rangeはWorker内の64 MB LRU cacheで再利用し、カメラ移動時は新しく必要になったRow Group/pageだけを転送します。Row Groupは並列に読み、完了した順にposition/color `Float32Array`の所有権をmain threadへ移して即座に描画します。既存のRow Groupは次の選択が揃うまで残し、同じindexだけを差分置換してから不要分を除去するため、LOD更新時に全点群が消えません。対応するbboxも完了時に明表示されます。色変更でもRow Groupごとのbufferを維持し、中間の全点結合や配列sliceは行いません。
 
+Surface表示は同一の取得済みchunkを入力として、四角いpoint spriteを使う`Normal`と`Screen mesh`を切り替えられます。Screen meshは半解像度のpoint depth bufferを隣接gridとしてGPU上で三角形化し、設定値より長い辺をdepth discontinuityとして除去します。これは比較用のview-dependent surfaceであり、world-spaceの永続meshやexport用topologyは生成しません。
+
+Viewer内部ではParquet/Workerを隠すreader、GPU resourceを所有するrenderer、surface構築アルゴリズムであるmeshを別moduleにしています。mesh側はParquetやRow Groupを参照せず、renderer側はqueryとLOD選択を参照しません。
+
 ## ブラウザからRange query
 
 ZSTD decodeには `hyparquet-compressors` を同梱しています。ストレージ側は `Range` と `HEAD` に対応し、`Content-Length`, `Content-Range`, `Accept-Ranges` をCORSで公開する必要があります。ローカル確認用サーバーは次で起動できます。

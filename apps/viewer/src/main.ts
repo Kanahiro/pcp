@@ -1,12 +1,13 @@
-import type { QuantizedBounds, QueryMetrics, WorldBounds } from "@pointcloud-parquet/browser";
+import type { QueryMetrics, WorldBounds } from "@pointcloud-parquet/browser";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import "./style.css";
 import { BoundingBoxLayers } from "./bbox-layer";
+import type { SurfaceRepresentation, SurfaceSettings } from "./mesh/surface-representation";
 import type { ColorMode } from "./point-buffer";
-import { QuantizedPointMaterial } from "./point-material";
+import { ParquetPointCloudReader } from "./reader/point-cloud-reader";
+import { PointCloudRenderer } from "./renderer/point-cloud-renderer";
 import { selectRowGroupsBySse, type SpatialSseSelection } from "./sse";
-import { PointCloudWorkerClient } from "./worker-client";
 import type { CloudDescription, RenderedChunk } from "./worker-protocol";
 
 const DEFAULT_URL = "https://cogp-demo.spatialty.io/temp/114112.parquet";
@@ -45,6 +46,20 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
         <section class="control-section">
           <div class="section-heading"><span>Rendering</span><small id="level-caption">L0</small></div>
+          <fieldset>
+            <legend>Surface</legend>
+            <div class="segmented two-up" id="surface-mode">
+              <label><input type="radio" name="surface" value="normal" checked><span>Normal</span></label>
+              <label><input type="radio" name="surface" value="screen-mesh"><span>Screen mesh</span></label>
+            </div>
+          </fieldset>
+          <div class="mesh-controls" id="mesh-controls" hidden>
+            <label for="mesh-edge">Maximum mesh edge</label>
+            <div class="range-row">
+              <input id="mesh-edge" type="range" min="1" max="12" value="4" step="0.5" />
+              <output id="mesh-edge-value">4×</output>
+            </div>
+          </div>
           <label class="switch-row" for="auto-lod"><span><b>Automatic LOD</b><small>Per-Row Group geometric error</small></span><input id="auto-lod" type="checkbox" checked><i></i></label>
           <label for="sse-threshold">SSE threshold</label>
           <div class="range-row">
@@ -125,7 +140,7 @@ scene.background = new THREE.Color(0x111315);
 scene.fog = new THREE.FogExp2(0x111315, 0.00032);
 const camera = new THREE.PerspectiveCamera(43, 1, 0.01, 1_000_000);
 camera.up.set(0, 0, 1);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
 const controls = new OrbitControls(camera, viewport);
@@ -133,14 +148,11 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.075;
 controls.screenSpacePanning = true;
 controls.addEventListener("start", () => viewport.classList.add("is-dragging"));
-const cloudGroup = new THREE.Group();
-scene.add(cloudGroup);
 let renderDirty = true;
 
-const workerClient = new PointCloudWorkerClient();
+const pointCloudReader = new ParquetPointCloudReader();
 let cloud: CloudDescription | null = null;
-const pointObjects = new Map<number, THREE.Points>();
-let pointMaterial: QuantizedPointMaterial | null = null;
+let pointCloudRenderer: PointCloudRenderer | null = null;
 let boundingBoxes: BoundingBoxLayers | null = null;
 let origin: [number, number, number] = [0, 0, 0];
 let fullBounds: WorldBounds | null = null;
@@ -163,7 +175,8 @@ resizeObserver.observe(viewport);
 renderer.setAnimationLoop(() => {
   const cameraChanged = controls.update();
   if (renderDirty || cameraChanged) {
-    renderer.render(scene, camera);
+    if (pointCloudRenderer) pointCloudRenderer.render(scene, camera);
+    else renderer.render(scene, camera);
     renderDirty = false;
   }
 });
@@ -196,6 +209,8 @@ element<HTMLInputElement>("point-budget").addEventListener("input", () => {
   scheduleAutomaticLod();
 });
 element<HTMLInputElement>("point-size").addEventListener("input", updatePointSize);
+element<HTMLDivElement>("surface-mode").addEventListener("change", updateSurfaceMode);
+element<HTMLInputElement>("mesh-edge").addEventListener("input", updateSurfaceMode);
 element<HTMLDivElement>("color-mode").addEventListener("change", recolor);
 element<HTMLInputElement>("show-level-bounds").addEventListener("change", updateBoundingBoxes);
 element<HTMLInputElement>("show-row-group-bounds").addEventListener("change", updateBoundingBoxes);
@@ -217,7 +232,7 @@ async function openDataset(): Promise<void> {
   setBusy(true, "Opening Parquet metadata…");
   try {
     const url = element<HTMLInputElement>("url").value.trim();
-    cloud = await workerClient.open(url);
+    cloud = await pointCloudReader.open(url);
     const bounds = cloud.metadata.bounds;
     fullBounds = { min: [bounds[0], bounds[1], bounds[2]], max: [bounds[3], bounds[4], bounds[5]] };
     origin = [
@@ -226,9 +241,17 @@ async function openDataset(): Promise<void> {
       (bounds[2] + bounds[5]) / 2,
     ];
     boundingBoxes?.dispose();
+    pointCloudRenderer?.dispose();
     boundingBoxes = new BoundingBoxLayers(cloud, origin);
     scene.add(boundingBoxes.group);
-    clearRenderedPoints();
+    pointCloudRenderer = new PointCloudRenderer(
+      renderer,
+      cloud,
+      origin,
+      surfaceSettings(),
+      requestRender,
+    );
+    scene.add(pointCloudRenderer.group);
     updateBoundingBoxes();
     setBoundsInputs(fullBounds);
     const resolution = element<HTMLInputElement>("resolution");
@@ -266,7 +289,7 @@ async function queryAndRender(options: {
       ?? Array.from({ length: cloud.metadata.level_row_group_ends[resolution]! }, (_, index) => index);
     const loadedGroupIndices: number[] = [];
     const visibleGroupIndices: number[] = [];
-    boundingBoxes?.setSelectedRowGroups([...pointObjects.keys()]);
+    boundingBoxes?.setSelectedRowGroups(pointCloudRenderer?.indices() ?? []);
     const retainedPointCount = renderedPointCount();
     if (retainedPointCount > 0) {
       setStatus(`${formatInteger(retainedPointCount)} points visible · fetching refinement…`, "loading");
@@ -278,7 +301,7 @@ async function queryAndRender(options: {
       if (replaceRenderedChunk(chunk, bounds)) {
         visibleGroupIndices.push(chunk.rowGroupIndex);
       }
-      boundingBoxes?.setSelectedRowGroups([...pointObjects.keys()]);
+      boundingBoxes?.setSelectedRowGroups(pointCloudRenderer!.indices());
       setStatus(
         `${formatInteger(renderedPointCount())} points visible · ${loadedGroups}/${selectedGroups.length} Row Groups`,
         "loading",
@@ -286,13 +309,13 @@ async function queryAndRender(options: {
       element<HTMLDivElement>("empty-state").classList.add("hidden");
     };
     const result = options.rowGroupIndices
-      ? await workerClient.queryRowGroups(
+      ? await pointCloudReader.readRowGroups(
           bounds,
           options.rowGroupIndices,
           selectedColorMode(),
           onChunk,
         )
-      : await workerClient.query(bounds, resolution, selectedColorMode(), onChunk);
+      : await pointCloudReader.readLevel(bounds, resolution, selectedColorMode(), onChunk);
     loadedSelectionKey = options.selectionKey ?? `level:${resolution}:${boundsKey(bounds)}`;
     retainRenderedGroups(new Set(visibleGroupIndices));
     boundingBoxes?.setSelectedRowGroups(loadedGroupIndices);
@@ -310,108 +333,24 @@ async function queryAndRender(options: {
   }
 }
 
-function clearRenderedPoints(): void {
-  for (const object of pointObjects.values()) {
-    cloudGroup.remove(object);
-    object.geometry.dispose();
-  }
-  pointObjects.clear();
-  pointMaterial?.dispose();
-  pointMaterial = null;
-  requestRender();
-}
-
 function replaceRenderedChunk(
   chunk: RenderedChunk,
   queryBounds: WorldBounds,
 ): boolean {
-  const { rowGroupIndex, quantizedPositions, colors } = chunk;
-  const previous = pointObjects.get(rowGroupIndex);
-  if (previous) {
-    cloudGroup.remove(previous);
-    previous.geometry.dispose();
-    pointObjects.delete(rowGroupIndex);
-  }
-  if (quantizedPositions.length === 0) {
-    requestRender();
-    return false;
-  }
-  const geometry = new THREE.BufferGeometry();
-  const position = new THREE.BufferAttribute(quantizedPositions, 3);
-  position.gpuType = THREE.IntType;
-  geometry.setAttribute("position", position);
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  setGeometryBounds(geometry, rowGroupIndex, queryBounds);
-  pointMaterial ??= createPointMaterial();
-  const object = new THREE.Points(geometry, pointMaterial);
-  pointObjects.set(rowGroupIndex, object);
-  cloudGroup.add(object);
-  requestRender();
-  return true;
-}
-
-function createPointMaterial(): QuantizedPointMaterial {
-  if (!cloud) throw new Error("point cloud metadata is not available");
-  const quantizedBounds = cloud.rowGroups.reduce<QuantizedBounds>((union, group) => ({
-    min: union.min.map((value, axis) => Math.min(value, group.quantizedBounds.min[axis]!)) as [number, number, number],
-    max: union.max.map((value, axis) => Math.max(value, group.quantizedBounds.max[axis]!)) as [number, number, number],
-  }), {
-    min: [...cloud.rowGroups[0]!.quantizedBounds.min] as [number, number, number],
-    max: [...cloud.rowGroups[0]!.quantizedBounds.max] as [number, number, number],
-  });
-  const material = new QuantizedPointMaterial(
-    cloud.metadata,
-    origin,
-    quantizedBounds,
-    Number(element<HTMLInputElement>("point-size").value),
-  );
-  material.viewportScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
-  return material;
-}
-
-function setGeometryBounds(
-  geometry: THREE.BufferGeometry,
-  rowGroupIndex: number,
-  queryBounds: WorldBounds,
-): void {
-  const groupBounds = cloud!.rowGroups[rowGroupIndex]!.worldBounds;
-  const minimum = new THREE.Vector3(
-    Math.max(groupBounds.min[0], queryBounds.min[0]) - origin[0],
-    Math.max(groupBounds.min[1], queryBounds.min[1]) - origin[1],
-    Math.max(groupBounds.min[2], queryBounds.min[2]) - origin[2],
-  );
-  const maximum = new THREE.Vector3(
-    Math.min(groupBounds.max[0], queryBounds.max[0]) - origin[0],
-    Math.min(groupBounds.max[1], queryBounds.max[1]) - origin[1],
-    Math.min(groupBounds.max[2], queryBounds.max[2]) - origin[2],
-  );
-  geometry.boundingBox = new THREE.Box3(minimum, maximum);
-  geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new THREE.Sphere());
+  if (!pointCloudRenderer) return false;
+  return pointCloudRenderer.replace(chunk, queryBounds);
 }
 
 function retainRenderedGroups(indices: Set<number>): void {
-  for (const [index, object] of pointObjects) {
-    if (indices.has(index)) continue;
-    cloudGroup.remove(object);
-    object.geometry.dispose();
-    pointObjects.delete(index);
-  }
-  requestRender();
+  pointCloudRenderer?.retain(indices);
 }
 
 function renderedPointCount(): number {
-  let count = 0;
-  for (const object of pointObjects.values()) {
-    count += object.geometry.getAttribute("position").count;
-  }
-  return count;
+  return pointCloudRenderer?.pointCount() ?? 0;
 }
 
 function fitView(): void {
-  const renderedBounds = new THREE.Box3();
-  for (const object of pointObjects.values()) {
-    if (object.geometry.boundingBox) renderedBounds.union(object.geometry.boundingBox);
-  }
+  const renderedBounds = pointCloudRenderer?.boundingBox() ?? new THREE.Box3();
   const pointSphere = renderedBounds.isEmpty()
     ? null
     : renderedBounds.getBoundingSphere(new THREE.Sphere());
@@ -447,18 +386,9 @@ function datasetBoundingSphere(): THREE.Sphere | null {
 }
 
 async function recolor(): Promise<void> {
-  if (pointObjects.size === 0 || isBusy) return;
+  if (!pointCloudRenderer || pointCloudRenderer.pointCount() === 0 || isBusy) return;
   try {
-    const { colorChunks } = await workerClient.recolor(selectedColorMode());
-    for (const { rowGroupIndex, colors } of colorChunks) {
-      const object = pointObjects.get(rowGroupIndex);
-      if (!object) continue;
-      object.geometry.setAttribute(
-        "color",
-        new THREE.BufferAttribute(colors, 3),
-      );
-    }
-    requestRender();
+    pointCloudRenderer.recolor(await pointCloudReader.recolor(selectedColorMode()));
   } catch (error) {
     setFailure(error);
   }
@@ -467,8 +397,28 @@ async function recolor(): Promise<void> {
 function updatePointSize(): void {
   const value = element<HTMLInputElement>("point-size").value;
   element<HTMLOutputElement>("point-size-value").value = value;
-  if (pointMaterial) pointMaterial.pointSize = Number(value);
-  requestRender();
+  pointCloudRenderer?.update(surfaceSettings());
+}
+
+function updateSurfaceMode(): void {
+  const settings = surfaceSettings();
+  element<HTMLElement>("mesh-controls").hidden = settings.representation !== "screen-mesh";
+  element<HTMLOutputElement>("mesh-edge-value").value = `${settings.meshEdgeThreshold}×`;
+  pointCloudRenderer?.update(settings);
+}
+
+function surfaceSettings(): SurfaceSettings {
+  const representation = document.querySelector<HTMLInputElement>(
+    'input[name="surface"]:checked',
+  )!.value as SurfaceRepresentation;
+  return {
+    representation,
+    pointSize: Number(element<HTMLInputElement>("point-size").value),
+    meshEdgeThreshold: Number(element<HTMLInputElement>("mesh-edge").value),
+    // Half resolution caps reconstruction at roughly one quarter of the
+    // viewport cells while preserving enough detail for visual comparison.
+    meshResolutionScale: 0.5,
+  };
 }
 
 function updateResolutionLabel(): void {
@@ -657,9 +607,7 @@ function resize(): void {
   const { clientWidth, clientHeight } = viewport;
   if (clientWidth === 0 || clientHeight === 0) return;
   renderer.setSize(clientWidth, clientHeight, false);
-  if (pointMaterial) {
-    pointMaterial.viewportScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
-  }
+  pointCloudRenderer?.resize();
   camera.aspect = clientWidth / clientHeight;
   camera.updateProjectionMatrix();
   requestRender();

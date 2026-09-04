@@ -35,6 +35,7 @@ precision highp float;
 
 uniform vec3 fogColor;
 uniform float fogDensity;
+uniform int outputMode;
 
 in vec3 vertexColor;
 in float fogDepth;
@@ -48,6 +49,11 @@ vec3 linearToSrgb(vec3 value) {
 }
 
 void main() {
+  if (outputMode == 1) {
+    outputColor = vec4(vertexColor, 1.0);
+    return;
+  }
+
   float fogFactor = 1.0 - exp(-fogDensity * fogDensity * fogDepth * fogDepth);
   vec3 color = mix(vertexColor, fogColor, fogFactor);
   outputColor = vec4(linearToSrgb(color), 1.0);
@@ -79,6 +85,7 @@ export class QuantizedPointMaterial extends THREE.RawShaderMaterial {
         viewportScale: { value: 1 },
         fogColor: { value: new THREE.Color(0x111315) },
         fogDensity: { value: 0.00032 },
+        outputMode: { value: 0 },
       },
     });
   }
@@ -89,5 +96,9 @@ export class QuantizedPointMaterial extends THREE.RawShaderMaterial {
 
   set viewportScale(value: number) {
     this.uniforms.viewportScale!.value = value;
+  }
+
+  set prepass(value: boolean) {
+    this.uniforms.outputMode!.value = value ? 1 : 0;
   }
 }

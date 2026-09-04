@@ -1,4 +1,5 @@
-import type { ColorMode } from "./point-buffer";
+import type { WorldBounds } from "@pointcloud-parquet/browser";
+import type { ColorMode } from "../point-buffer";
 import type {
   CloudDescription,
   RecoloredPoints,
@@ -6,11 +7,29 @@ import type {
   RenderedQuery,
   WorkerCommand,
   WorkerResponse,
-} from "./worker-protocol";
-import type { WorldBounds } from "@pointcloud-parquet/browser";
+} from "../worker-protocol";
 
-export class PointCloudWorkerClient {
-  private readonly worker = new Worker(new URL("./point-cloud.worker.ts", import.meta.url), {
+/** Streaming boundary used by the viewer; Parquet and Worker details stay behind it. */
+export interface PointCloudReader {
+  open(url: string): Promise<CloudDescription>;
+  readLevel(
+    bounds: WorldBounds,
+    resolution: number,
+    colorMode: ColorMode,
+    onChunk?: (chunk: RenderedChunk) => void,
+  ): Promise<RenderedQuery>;
+  readRowGroups(
+    bounds: WorldBounds,
+    rowGroupIndices: number[],
+    colorMode: ColorMode,
+    onChunk?: (chunk: RenderedChunk) => void,
+  ): Promise<RenderedQuery>;
+  recolor(colorMode: ColorMode): Promise<Array<{ rowGroupIndex: number; colors: Float32Array }>>;
+}
+
+/** Parquet reader proxy. It owns command ordering and transferable chunk delivery. */
+export class ParquetPointCloudReader implements PointCloudReader {
+  private readonly worker = new Worker(new URL("../point-cloud.worker.ts", import.meta.url), {
     type: "module",
     name: "point-cloud-parquet",
   });
@@ -47,7 +66,7 @@ export class PointCloudWorkerClient {
     return this.send({ kind: "open", url });
   }
 
-  query(
+  readLevel(
     bounds: WorldBounds,
     resolution: number,
     colorMode: ColorMode,
@@ -56,7 +75,7 @@ export class PointCloudWorkerClient {
     return this.send({ kind: "query-level", bounds, resolution, colorMode }, onChunk);
   }
 
-  queryRowGroups(
+  readRowGroups(
     bounds: WorldBounds,
     rowGroupIndices: number[],
     colorMode: ColorMode,
@@ -68,8 +87,10 @@ export class PointCloudWorkerClient {
     );
   }
 
-  recolor(colorMode: ColorMode): Promise<RecoloredPoints> {
-    return this.send({ kind: "recolor", colorMode });
+  async recolor(
+    colorMode: ColorMode,
+  ): Promise<Array<{ rowGroupIndex: number; colors: Float32Array }>> {
+    return (await this.send<RecoloredPoints>({ kind: "recolor", colorMode })).colorChunks;
   }
 
   private send<T>(command: WorkerCommand, onChunk?: (chunk: RenderedChunk) => void): Promise<T> {
