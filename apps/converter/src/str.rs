@@ -10,6 +10,18 @@ pub fn pack_levels(levels: &mut [Level], row_group_size: usize) {
     }
 }
 
+/// Recursively packs each Row Group into spatially compact data-page leaves.
+/// Points never cross a Row Group boundary established by `pack_levels`.
+pub fn pack_pages(levels: &mut [Level], row_group_size: usize, page_row_count: usize) {
+    assert!(row_group_size > 0);
+    assert!(page_row_count > 0);
+    for level in levels {
+        for row_group in level.points.chunks_mut(row_group_size) {
+            pack(row_group, page_row_count);
+        }
+    }
+}
+
 fn pack(points: &mut [Point], leaf_capacity: usize) {
     if points.is_empty() {
         return;
@@ -98,6 +110,40 @@ mod tests {
             let span = |coordinate: fn(&Point) -> i32| {
                 let min = chunk.iter().map(coordinate).min().unwrap();
                 let max = chunk.iter().map(coordinate).max().unwrap();
+                max - min
+            };
+            assert!(span(|point| point.x) <= 1);
+            assert!(span(|point| point.y) <= 1);
+            assert!(span(|point| point.z) <= 1);
+        }
+    }
+
+    #[test]
+    fn nested_page_chunks_are_compact_3d_tiles() {
+        let mut levels = vec![Level {
+            resolution: 0,
+            points: (0..4)
+                .flat_map(|x| {
+                    (0..4).flat_map(move |y| {
+                        (0..4).map(move |z| Point {
+                            x,
+                            y,
+                            z,
+                            source_index: (x * 16 + y * 4 + z) as u32,
+                        })
+                    })
+                })
+                .rev()
+                .collect(),
+        }];
+
+        pack_levels(&mut levels, 64);
+        pack_pages(&mut levels, 64, 8);
+
+        for page in levels[0].points.chunks(8) {
+            let span = |coordinate: fn(&Point) -> i32| {
+                let min = page.iter().map(coordinate).min().unwrap();
+                let max = page.iter().map(coordinate).max().unwrap();
                 max - min
             };
             assert!(span(|point| point.x) <= 1);

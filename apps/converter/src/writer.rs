@@ -2,8 +2,8 @@ use std::{fs::File, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use arrow_array::{
-    ArrayRef, BooleanArray, Float32Array, Float64Array, Int16Array, Int32Array, RecordBatch,
-    UInt8Array, UInt16Array, UInt32Array, UInt64Array, builder::BinaryBuilder,
+    ArrayRef, BooleanArray, Float32Array, Float64Array, Int32Array, RecordBatch, UInt8Array,
+    UInt16Array, UInt32Array, UInt64Array, builder::BinaryBuilder,
 };
 use arrow_schema::{DataType, Field, Schema};
 use parquet::{
@@ -72,7 +72,7 @@ pub fn write_parquet(
         Field::new("withheld", DataType::Boolean, false),
         Field::new("overlap", DataType::Boolean, false),
         Field::new("scanner_channel", DataType::UInt8, false),
-        Field::new("scan_angle", DataType::Int16, false),
+        Field::new("scan_angle", DataType::Float32, false),
         Field::new("user_data", DataType::UInt8, false),
         Field::new("point_source_id", DataType::UInt16, false),
         Field::new("gps_time", DataType::Float64, true),
@@ -228,7 +228,7 @@ pub fn write_parquet(
                             .iter()
                             .map(|point| attributes.scanner_channel[index(point)]),
                     )),
-                    Arc::new(Int16Array::from_iter_values(
+                    Arc::new(Float32Array::from_iter_values(
                         chunk
                             .iter()
                             .map(|point| attributes.scan_angle[index(point)]),
@@ -312,11 +312,7 @@ mod tests {
     use parquet::file::reader::{FileReader, SerializedFileReader};
 
     use super::*;
-    use crate::{
-        Point,
-        attributes::LasAttributes,
-        metadata::{SourceLasMetadata, build_level_row_group_ends},
-    };
+    use crate::{Point, attributes::LasAttributes, metadata::build_level_row_group_ends};
 
     #[test]
     fn preserves_level_boundaries_as_row_group_boundaries() {
@@ -369,15 +365,8 @@ mod tests {
             offset: [0.0; 3],
             bounds: [0.0, 0.0, 0.0, 0.12, 0.12, 0.12],
             level_row_group_ends: build_level_row_group_ends([2, 3], 2),
-            base_voxel_size: 0.01,
-            coarsest_voxel_size: 0.02,
-            hierarchy: "additive_voxel_first".into(),
-            spatial_order: "str_3d_row_group".into(),
-            source_las: SourceLasMetadata {
-                point_format: 0,
-                extra_bytes_per_point: 0,
-                scan_angle_scale: 1.0,
-            },
+            voxel_edge_ratio: 2,
+            crs: serde_json::Value::Null,
         };
         write_parquet(
             temporary.path(),

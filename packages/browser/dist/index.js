@@ -198,11 +198,8 @@ function isPointCloudMetadata(value) {
         isNumberTuple(item.bounds, 6) &&
         Array.isArray(item.level_row_group_ends) && item.level_row_group_ends.length > 0 &&
         item.level_row_group_ends.every(isNonNegativeInteger) &&
-        typeof item.base_voxel_size === "number" && item.base_voxel_size > 0 &&
-        (item.coarsest_voxel_size === undefined ||
-            (typeof item.coarsest_voxel_size === "number" && item.coarsest_voxel_size > 0)) &&
-        typeof item.hierarchy === "string" &&
-        typeof item.spatial_order === "string");
+        Number.isInteger(item.voxel_edge_ratio) && Number(item.voxel_edge_ratio) >= 2 &&
+        (item.crs === null || (typeof item.crs === "object" && !Array.isArray(item.crs))));
 }
 function isNonNegativeInteger(value) {
     return Number.isSafeInteger(value) && Number(value) >= 0;
@@ -313,9 +310,7 @@ function buildSpatialRowGroups(rowGroups, metadata) {
             pointCount,
             rowStart,
             rowEnd: rowStart + pointCount,
-            geometricError: resolution === lastResolution
-                ? 0
-                : voxelSizeAt(metadata, resolution) * Math.sqrt(3),
+            geometricError: resolution === lastResolution ? 0 : voxelDiagonalAt(metadata, resolution),
             quantizedBounds,
             worldBounds: decodeBounds(quantizedBounds, metadata),
         };
@@ -338,10 +333,9 @@ function buildResolutionInfo(rowGroups, metadata) {
             rowStart,
             rowEnd,
             pointCount,
-            voxelSize: voxelSizeAt(metadata, resolution),
             geometricError: resolution === levelCount - 1
                 ? 0
-                : voxelSizeAt(metadata, resolution) * Math.sqrt(3),
+                : voxelDiagonalAt(metadata, resolution),
             worldBounds: unionBounds(groups.map((group) => group.worldBounds)),
         };
         rowGroupStart = rowGroupEnd;
@@ -349,10 +343,9 @@ function buildResolutionInfo(rowGroups, metadata) {
         return info;
     });
 }
-function voxelSizeAt(metadata, resolution) {
-    const coarsest = metadata.coarsest_voxel_size
-        ?? metadata.base_voxel_size * 2 ** (metadata.level_row_group_ends.length - 1);
-    return coarsest / 2 ** resolution;
+function voxelDiagonalAt(metadata, resolution) {
+    const exponent = metadata.level_row_group_ends.length - 1 - resolution;
+    return Math.hypot(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
 }
 function rowGroupBounds(rowGroup) {
     const ranges = columnRanges(rowGroup);

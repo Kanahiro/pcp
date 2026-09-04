@@ -5,15 +5,8 @@ export interface PointCloudMetadata {
     offset: [number, number, number];
     bounds: [number, number, number, number, number, number];
     level_row_group_ends: number[];
-    base_voxel_size: number;
-    coarsest_voxel_size?: number;
-    hierarchy: string;
-    spatial_order: string;
-    source_las?: {
-        point_format: number;
-        extra_bytes_per_point: number;
-        scan_angle_scale: number;
-    };
+    voxel_edge_ratio: number;
+    crs: Record<string, unknown> | null;
 }
 export interface QuantizedBounds {
     min: [number, number, number];
@@ -36,7 +29,6 @@ export interface ResolutionInfo {
     rowStart: number;
     rowEnd: number;
     pointCount: number;
-    voxelSize: number;
     geometricError: number;
     worldBounds: WorldBounds | null;
 }

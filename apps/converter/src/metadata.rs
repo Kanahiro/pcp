@@ -9,11 +9,9 @@ pub struct PointCloudMetadata {
     /// Exclusive Row Group end for each resolution level. Starts are the
     /// previous entries (or zero), so storing them would be redundant.
     pub level_row_group_ends: Vec<u32>,
-    pub base_voxel_size: f64,
-    pub coarsest_voxel_size: f64,
-    pub hierarchy: String,
-    pub spatial_order: String,
-    pub source_las: SourceLasMetadata,
+    pub voxel_edge_ratio: u32,
+    /// PROJJSON object, or null when the source does not declare a CRS.
+    pub crs: serde_json::Value,
 }
 
 pub fn build_level_row_group_ends(
@@ -29,13 +27,6 @@ pub fn build_level_row_group_ends(
             row_group_end
         })
         .collect()
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct SourceLasMetadata {
-    pub point_format: u8,
-    pub extra_bytes_per_point: u16,
-    pub scan_angle_scale: f32,
 }
 
 #[cfg(test)]

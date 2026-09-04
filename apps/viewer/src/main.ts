@@ -610,9 +610,9 @@ function updateDatasetMeta(): void {
   if (!cloud) return;
   const meta = cloud.metadata;
   element<HTMLElement>("dataset-meta").innerHTML = `
-    <span>${meta.spatial_order}</span><span>${cloud.resolutions.length} levels</span>
+    <span>×${meta.voxel_edge_ratio} voxel</span><span>${cloud.resolutions.length} levels</span>
     <span>${cloud.rowGroups.length} Row Groups</span>
-    <span>LAS ${meta.source_las?.point_format ?? "—"}</span><span>${formatBytes(cloud.metadataBytesFetched)} footer</span>
+    <span>metadata ${meta.version}</span><span>${formatBytes(cloud.metadataBytesFetched)} footer</span>
     <small>scale ${meta.scale.map((value) => formatCoordinate(value)).join(" / ")}</small>`;
 }
 

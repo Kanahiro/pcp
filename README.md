@@ -11,7 +11,7 @@ packages/browser/  Hyparquet製 TypeScript Range reader
 scripts/           Range対応ローカルサーバーとDuckDBベンチマーク
 ```
 
-ファイルschemaは空間列に加え、LAS 1.4 point format 0〜10の全標準属性を個別カラムとして保持します。Parquet v2、ZSTD、column statistics有効で出力します。file-level key/value metadataの `point_cloud` にscale、offset、実座標bounds、LOD情報、元のpoint format、scan angle scaleをJSONで保存します。
+ファイルschemaは空間列に加え、LAS 1.4 point format 0〜10の全標準属性を個別カラムとして保持します。Parquet v2、ZSTD、column statistics有効で出力します。file-level key/value metadataの `point_cloud` にはscale、offset、実座標bounds、LOD境界、voxel edge ratio、CRSをJSONで保存します。CRSはGeoParquet 1.1と同じPROJJSON objectで保存し、未定義の場合は明示的にnullとします。
 
 現在の `point_cloud.version` は `0.1.0` です。
 
@@ -28,9 +28,9 @@ waveform_x_t, waveform_y_t, waveform_z_t,
 extra_bytes
 ```
 
-入力point formatに存在しないoptional属性はnullです。`scan_angle` は圧縮比較のためLAS生整数を保持し、実角度はmetadataの `source_las.scan_angle_scale` を掛けて復元します。Extra BytesはVLR固有の意味を推測せず、生payloadをpoint単位のbinaryとして保持します。
+入力point formatに存在しないoptional属性はnullです。`scan_angle` はpoint formatによらず度単位のFloat32へ正規化します。Extra BytesはVLR固有の意味を推測せず、生payloadをpoint単位のbinaryとして保持します。
 
-LODはpoint columnではありません。levelは物理的に連続し、Row Groupがlevel境界を跨がないため、file metadataには各levelのexclusive endだけを `level_row_group_ends` として保存します。配列indexがlevel番号、startは直前のend（L0だけ0）なので一意に復元できます。
+LODはpoint columnではありません。levelは物理的に連続し、Row Groupがlevel境界を跨がないため、file metadataには各levelのexclusive endだけを `level_row_group_ends` として保存します。配列indexがlevel番号、startは直前のend（L0だけ0）なので一意に復元できます。点がないlevelも直前と同じendを保持し、配列長が完全なvoxel ladderのlevel数を表します。
 
 ## セットアップ
 
@@ -46,26 +46,29 @@ pnpm build
 
 ```sh
 cargo run --release -p pcp-convert -- \
-  input.laz points.parquet \
+  ./src/*.laz --output points.parquet \
   --coarse-points 8192 \
+  --voxel-edge-ratio 2 \
   --row-group-size 65536 \
-  --page-row-count 8192 \
+  --page-row-count 4096 \
   --zstd-level 9
 ```
 
-resolutionを決定した後、各levelをRow Group容量を葉サイズとする3次元STR（X slab → Y tile → Z order）で独立にpackします。保存するXYZは元のLAS量子化整数のままです。
+resolutionを決定した後、各levelをRow Group容量を葉サイズとする3次元STR（X slab → Y tile → Z order）で独立にpackします。さらに各Row Group内をdata page容量でもう一度3次元STRし、通常の64K / 4K構成では16個の空間的にコンパクトなpageへ分割します。保存するXYZは元のLAS量子化整数のままです。
 
 XYZとintensityには `DELTA_BINARY_PACKED`、GPS timeには `BYTE_STREAM_SPLIT` を明示します。RGBやscan angleなど、実測でdictionaryの方が小さかった列はwriterのdictionary encodingを維持します。全列の後段圧縮はZSTD level 9です。圧縮パラメータの比較根拠と測定条件は [圧縮・ストリーミング比較](benchmarks/compression-study.md) にまとめています。
 
-`--page-order` はSTRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
+`--page-order` はnested STRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
 
-`--base-voxel-size` は入力と同じ実座標単位（通常はm）です。省略時はLASの3軸scaleの最大値を最細候補に使います。`--levels` も省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小の2のべき乗voxelを選び、辺長をlevelごとに1/2へ下げます。したがって巨大なroot voxelの1点から始めず、最初の表示に使える数千点から開始できます。各voxelで入力順の最初の未採用点を選び、全点は重複も欠落もなくちょうど1 levelへ所属します。比較実験ではこれらのoptionを明示してladderを固定できます。
+voxelはLASの量子化整数格子上で構築します。levelを1段粗くしたときの各軸の辺長比は `--voxel-edge-ratio`（既定2）で指定し、2以上の整数に限定します。総level数をN、level番号をrとすると、各軸の物理辺長は `scale[axis] * ratio^(N - 1 - r)` です。`--levels` を省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小のratio冪を選びます。最終levelは残点をすべて格納してexactにし、全点は重複も欠落もなくちょうど1 levelへ所属します。
 
 Row Groupは指定点数を上限とし、level境界で必ず終了します。そのため各levelの末尾だけは小さくなります。CLIはlevel別点数、出力サイズ、bytes/point、変換時間をJSONで表示します。
 
+入力には任意の数のLAS/LAZファイルを指定でき、すべてを一つのParquetへまとめます。入力群は同じ座標scale/offset、point format、CRSを持つ必要があります。
+
 既定値は64K点です。ブラウザreaderはquery bboxに完全包含されるRow Groupでは、物理的に連続するXYZRGBを1本のHTTP Rangeへまとめます。bbox境界と交差するRow Groupだけはpage単位で取得します。
 
-各Row Group内は既定8K行のdata pageに分かれ、Page Index/Offset Indexを使ってbbox外のpageを取得前に除外します。
+各Row Group内はnested STRによる既定4K行のdata pageに分かれ、Page Index/Offset Indexを使ってbbox外のpageを取得前に除外します。
 
 ## DuckDBでpruningを確認
 
@@ -148,7 +151,7 @@ pnpm test
 ## PoC上の制約
 
 - 変換時はXYZをメモリに全件保持します。巨大データ向け外部sortは未実装です。
-- STRは各resolution内をX/Y/Zの順に再帰分割し、Row Group境界へ揃えます。空間領域を直接packするため、Row Groupのbbox pruningを主目的にできます。
+- STRは各resolution内をX/Y/Zの順に分割してRow Group境界へ揃え、各Row Group内でも同じ処理をdata page境界へ適用します。Row Groupとpageの両方でbbox pruningを利用できます。
 - STRはRow Groupの3D bbox体積を小さくする一方、特定軸の全域を含む平面的なqueryでは空間曲線より候補数が増える場合があります。比較時は3D boxとXY boxを分けて計測します。
 - LOD代表点は入力順に依存します。見た目や密度を最適化するアルゴリズムではありません。
 - 独自index、VLR/EVLRコンテナの複製、COPC生成/decoderは対象外です。

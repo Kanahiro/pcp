@@ -8,49 +8,43 @@ pub struct Level {
     pub points: Vec<Point>,
 }
 
-/// Chooses a power-of-two ladder whose coarsest cubic voxel covers the
-/// dataset and whose finest possible edge is the requested quantization
-/// precision. The exact level may be reached earlier when the source has no
-/// points close enough to require the remaining rungs.
-pub fn automatic_level_count(
-    bounds: IntegerBounds,
-    scales: [f64; 3],
-    finest_voxel_size: f64,
-) -> u8 {
-    let spans = [
-        (i64::from(bounds.max.x) - i64::from(bounds.min.x)) as f64 * scales[0],
-        (i64::from(bounds.max.y) - i64::from(bounds.min.y)) as f64 * scales[1],
-        (i64::from(bounds.max.z) - i64::from(bounds.min.z)) as f64 * scales[2],
-    ];
-    let largest_span = spans.into_iter().fold(0.0_f64, f64::max);
-    let coarsest_exponent = if largest_span <= finest_voxel_size {
-        0
-    } else {
-        (largest_span / finest_voxel_size).log2().ceil() as u32
-    };
-    u8::try_from(coarsest_exponent.saturating_add(1)).unwrap_or(u8::MAX)
+/// Number of levels in the complete quantized-grid ladder. The last level is
+/// exact; preceding levels use `ratio^exponent` raw coordinate units per axis.
+pub fn automatic_level_count(bounds: IntegerBounds, ratio: u32) -> u8 {
+    assert!(ratio >= 2);
+    let largest_span = [
+        i64::from(bounds.max.x) - i64::from(bounds.min.x),
+        i64::from(bounds.max.y) - i64::from(bounds.min.y),
+        i64::from(bounds.max.z) - i64::from(bounds.min.z),
+    ]
+    .into_iter()
+    .max()
+    .unwrap_or(0) as u64;
+    let mut exponent = 0_u8;
+    let mut width = 1_u64;
+    while width <= largest_span {
+        width = width.saturating_mul(u64::from(ratio));
+        exponent = exponent.saturating_add(1);
+    }
+    exponent.saturating_add(1)
 }
 
-/// Chooses the smallest power-of-two voxel whose occupied-cell count does not
-/// exceed the desired L0 size. This avoids a one-point root while preserving
-/// the half-edge geometric-error ladder used by SSE.
+/// Chooses the smallest ratio-power voxel whose occupied-cell count does not
+/// exceed the desired L0 size. This avoids starting from a one-point root.
 pub fn automatic_level_count_for_target(
     points: &[Point],
     bounds: IntegerBounds,
-    scales: [f64; 3],
-    finest_voxel_size: f64,
+    ratio: u32,
     target_points: usize,
 ) -> u8 {
     assert!(target_points > 0);
-    let maximum_levels = automatic_level_count(bounds, scales, finest_voxel_size);
+    let maximum_levels = automatic_level_count(bounds, ratio);
     let mut lower_exponent = 0_u32;
     let mut upper_exponent = u32::from(maximum_levels - 1);
     while lower_exponent < upper_exponent {
         let exponent = (lower_exponent + upper_exponent) / 2;
-        let voxel_size = finest_voxel_size * 2_f64.powi(exponent as i32);
-        if occupied_voxel_count(points, bounds.min, scales, voxel_size, target_points)
-            <= target_points
-        {
+        let voxel_width = voxel_width(ratio, exponent);
+        if occupied_voxel_count(points, bounds.min, voxel_width, target_points) <= target_points {
             upper_exponent = exponent;
         } else {
             lower_exponent = exponent + 1;
@@ -59,49 +53,40 @@ pub fn automatic_level_count_for_target(
     u8::try_from(lower_exponent.saturating_add(1)).unwrap_or(u8::MAX)
 }
 
-pub fn coarsest_voxel_size(levels: u8, finest_voxel_size: f64) -> f64 {
-    finest_voxel_size * 2_f64.powi(i32::from(levels - 1))
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Voxel(i64, i64, i64);
 
 /// Builds an additive hierarchy. Each rung selects one point per voxel from
-/// points not selected by coarser rungs. Construction stops as soon as every
-/// source point is represented; an explicit final rung absorbs any remaining
-/// points so no point is duplicated or dropped.
+/// points not selected by coarser rungs. The complete ladder is retained even
+/// when intermediate levels are empty, making its exponent derivable from the
+/// level count. The finest level absorbs every remaining point exactly.
 pub fn build_levels(
     points: Vec<Point>,
     levels: u8,
-    base_voxel_size: f64,
-    scales: [f64; 3],
+    ratio: u32,
     bounds: IntegerBounds,
 ) -> Vec<Level> {
     assert!(levels > 0);
-    assert!(base_voxel_size.is_finite() && base_voxel_size > 0.0);
+    assert!(ratio >= 2);
 
     let mut remaining: Vec<Option<Point>> = points.into_iter().map(Some).collect();
-    let mut remaining_count = remaining.len();
     let mut output = Vec::with_capacity(levels as usize);
 
     for resolution in 0..levels {
-        let is_last = resolution + 1 == levels;
         let mut selected = Vec::new();
 
-        if is_last {
+        if resolution + 1 == levels {
             selected.extend(remaining.iter_mut().filter_map(Option::take));
-            remaining_count = 0;
         } else {
             let exponent = u32::from(levels - 1 - resolution);
-            let voxel_size = base_voxel_size * 2_f64.powi(exponent as i32);
+            let voxel_width = voxel_width(ratio, exponent);
             let mut occupied = HashSet::new();
             for slot in &mut remaining {
                 let Some(point) = *slot else { continue };
-                let voxel = voxel_for(point, bounds.min, scales, voxel_size);
+                let voxel = voxel_for(point, bounds.min, voxel_width);
                 if occupied.insert(voxel) {
                     selected.push(point);
                     *slot = None;
-                    remaining_count -= 1;
                 }
             }
         }
@@ -110,32 +95,35 @@ pub fn build_levels(
             resolution,
             points: selected,
         });
-        if remaining_count == 0 {
-            break;
-        }
     }
     output
 }
 
-fn voxel_for(point: Point, origin: Point, scales: [f64; 3], size: f64) -> Voxel {
-    // Origin-relative coordinates avoid precision loss from large geospatial offsets.
+fn voxel_width(ratio: u32, exponent: u32) -> u64 {
+    u64::from(ratio)
+        .checked_pow(exponent)
+        .unwrap_or(i64::MAX as u64)
+        .min(i64::MAX as u64)
+}
+
+fn voxel_for(point: Point, origin: Point, width: u64) -> Voxel {
+    let width = width as i64;
     Voxel(
-        ((f64::from(point.x) - f64::from(origin.x)) * scales[0] / size).floor() as i64,
-        ((f64::from(point.y) - f64::from(origin.y)) * scales[1] / size).floor() as i64,
-        ((f64::from(point.z) - f64::from(origin.z)) * scales[2] / size).floor() as i64,
+        (i64::from(point.x) - i64::from(origin.x)) / width,
+        (i64::from(point.y) - i64::from(origin.y)) / width,
+        (i64::from(point.z) - i64::from(origin.z)) / width,
     )
 }
 
 fn occupied_voxel_count(
     points: &[Point],
     origin: Point,
-    scales: [f64; 3],
-    voxel_size: f64,
+    voxel_width: u64,
     stop_after: usize,
 ) -> usize {
     let mut occupied = HashSet::with_capacity(stop_after.saturating_add(1));
     for &point in points {
-        occupied.insert(voxel_for(point, origin, scales, voxel_size));
+        occupied.insert(voxel_for(point, origin, voxel_width));
         if occupied.len() > stop_after {
             break;
         }
@@ -158,7 +146,7 @@ mod tests {
             })
             .collect();
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points.clone(), 5, 1.0, [1.0; 3], bounds);
+        let levels = build_levels(points.clone(), 5, 2, bounds);
         assert_eq!(
             points.len(),
             levels.iter().map(|l| l.points.len()).sum::<usize>()
@@ -190,13 +178,13 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points, 2, 4.0, [1.0; 3], bounds);
+        let levels = build_levels(points, 2, 4, bounds);
         assert_eq!(2, levels[0].points.len());
         assert_eq!(1, levels[1].points.len());
     }
 
     #[test]
-    fn derives_a_ladder_from_scale_and_bounds() {
+    fn derives_a_complete_ladder_from_quantized_bounds() {
         let points = vec![
             Point {
                 x: 0,
@@ -212,8 +200,7 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        assert_eq!(20, automatic_level_count(bounds, [0.001; 3], 0.001));
-        assert_eq!(524.288, coarsest_voxel_size(20, 0.001));
+        assert_eq!(20, automatic_level_count(bounds, 2));
     }
 
     #[test]
@@ -227,14 +214,14 @@ mod tests {
             })
             .collect();
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = automatic_level_count_for_target(&points, bounds, [1.0; 3], 1.0, 8);
+        let levels = automatic_level_count_for_target(&points, bounds, 2, 8);
         assert_eq!(5, levels);
-        let hierarchy = build_levels(points, levels, 1.0, [1.0; 3], bounds);
+        let hierarchy = build_levels(points, levels, 2, bounds);
         assert_eq!(7, hierarchy[0].points.len());
     }
 
     #[test]
-    fn stops_when_the_hierarchy_is_already_exact() {
+    fn retains_empty_levels_to_keep_the_ladder_derivable() {
         let points = vec![
             Point {
                 x: 0,
@@ -250,12 +237,42 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points, 10, 1.0, [1.0; 3], bounds);
-        assert!(levels.len() < 10);
+        let levels = build_levels(points, 10, 2, bounds);
+        assert_eq!(10, levels.len());
         assert_eq!(
             2,
             levels.iter().map(|level| level.points.len()).sum::<usize>()
         );
-        assert!(levels.iter().all(|level| !level.points.is_empty()));
+        assert!(levels.iter().skip(2).all(|level| level.points.is_empty()));
+    }
+
+    #[test]
+    fn finest_level_absorbs_coincident_points_exactly() {
+        let points = vec![
+            Point {
+                x: 0,
+                y: 0,
+                z: 0,
+                source_index: 0,
+            },
+            Point {
+                x: 0,
+                y: 0,
+                z: 0,
+                source_index: 1,
+            },
+            Point {
+                x: 1,
+                y: 0,
+                z: 0,
+                source_index: 2,
+            },
+        ];
+        let bounds = IntegerBounds::from_points(&points).unwrap();
+        let levels = build_levels(points, 2, 2, bounds);
+
+        assert_eq!(2, levels.len());
+        assert_eq!(1, levels[0].points.len());
+        assert_eq!(2, levels[1].points.len());
     }
 }

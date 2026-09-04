@@ -1,9 +1,5 @@
-use anyhow::{Result, bail};
-use las::{
-    Color, PointData,
-    point::ScanDirection,
-    raw::point::{ScanAngle, Waveform},
-};
+use anyhow::{Result, bail, ensure};
+use las::{Color, PointData, point::ScanDirection, raw::point::Waveform};
 
 use crate::Point;
 
@@ -22,7 +18,8 @@ pub struct LasAttributes {
     pub withheld: Vec<bool>,
     pub overlap: Vec<bool>,
     pub scanner_channel: Vec<u8>,
-    pub scan_angle: Vec<i16>,
+    /// Scan angle normalized to degrees for every LAS point format.
+    pub scan_angle: Vec<f32>,
     pub user_data: Vec<u8>,
     pub point_source_id: Vec<u16>,
     pub gps_time: Option<Vec<f64>>,
@@ -87,10 +84,7 @@ impl LasAttributes {
             if let Some(values) = &mut extra_bytes {
                 values.extend_from_slice(&point.extra_bytes);
             }
-            scan_angle.push(match point.into_raw(data.transforms())?.scan_angle {
-                ScanAngle::Rank(value) => i16::from(value),
-                ScanAngle::Scaled(value) => value,
-            });
+            scan_angle.push(point.scan_angle);
         }
 
         Ok((
@@ -132,6 +126,40 @@ impl LasAttributes {
         self.intensity.is_empty()
     }
 
+    /// Appends another source that has the same LAS point format.
+    ///
+    /// Optional columns are represented once for the complete dataset, so a
+    /// mixture of present and absent columns cannot be represented faithfully.
+    pub fn append(&mut self, mut other: Self) -> Result<()> {
+        ensure!(
+            self.extra_bytes_per_point == other.extra_bytes_per_point,
+            "LAS inputs have different Extra Bytes widths"
+        );
+
+        self.intensity.append(&mut other.intensity);
+        self.return_number.append(&mut other.return_number);
+        self.number_of_returns.append(&mut other.number_of_returns);
+        self.scan_direction_flag
+            .append(&mut other.scan_direction_flag);
+        self.edge_of_flight_line
+            .append(&mut other.edge_of_flight_line);
+        self.classification.append(&mut other.classification);
+        self.synthetic.append(&mut other.synthetic);
+        self.key_point.append(&mut other.key_point);
+        self.withheld.append(&mut other.withheld);
+        self.overlap.append(&mut other.overlap);
+        self.scanner_channel.append(&mut other.scanner_channel);
+        self.scan_angle.append(&mut other.scan_angle);
+        self.user_data.append(&mut other.user_data);
+        self.point_source_id.append(&mut other.point_source_id);
+        append_optional(&mut self.gps_time, other.gps_time, "GPS time")?;
+        append_optional(&mut self.color, other.color, "RGB")?;
+        append_optional(&mut self.nir, other.nir, "NIR")?;
+        append_optional(&mut self.waveform, other.waveform, "waveform")?;
+        append_optional(&mut self.extra_bytes, other.extra_bytes, "Extra Bytes")?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(crate) fn defaults(len: usize) -> Self {
         Self {
@@ -146,7 +174,7 @@ impl LasAttributes {
             withheld: vec![false; len],
             overlap: vec![false; len],
             scanner_channel: vec![0; len],
-            scan_angle: vec![0; len],
+            scan_angle: vec![0.0; len],
             user_data: vec![0; len],
             point_source_id: vec![0; len],
             gps_time: None,
@@ -157,4 +185,17 @@ impl LasAttributes {
             extra_bytes: None,
         }
     }
+}
+
+fn append_optional<T>(
+    destination: &mut Option<Vec<T>>,
+    source: Option<Vec<T>>,
+    name: &str,
+) -> Result<()> {
+    match (destination, source) {
+        (Some(destination), Some(mut source)) => destination.append(&mut source),
+        (None, None) => {}
+        _ => bail!("LAS inputs disagree on the presence of the {name} attribute"),
+    }
+    Ok(())
 }

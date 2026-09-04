@@ -1,15 +1,14 @@
 use std::{path::PathBuf, time::Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
-use las::Reader;
 use pcp_convert::{
     IntegerBounds,
-    attributes::LasAttributes,
-    hierarchy::{automatic_level_count_for_target, build_levels, coarsest_voxel_size},
-    metadata::{PointCloudMetadata, SourceLasMetadata, build_level_row_group_ends},
+    hierarchy::{automatic_level_count_for_target, build_levels},
+    input::read_inputs,
+    metadata::{PointCloudMetadata, build_level_row_group_ends},
     page_order::{PageOrder, reorder_pages},
-    str::pack_levels,
+    str::{pack_levels, pack_pages},
     writer::{IntensityEncoding, write_parquet},
 };
 use serde::Serialize;
@@ -17,17 +16,18 @@ use serde::Serialize;
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Args {
-    /// Input LAS or LAZ file.
-    input: PathBuf,
+    /// Input LAS or LAZ files. Shell globs such as ./src/*.laz are supported.
+    #[arg(required = true)]
+    inputs: Vec<PathBuf>,
     /// Output Parquet file.
+    #[arg(short, long)]
     output: PathBuf,
-    /// Maximum number of additive levels. Defaults to a scale/bounds-derived ladder.
+    /// Number of levels in the complete voxel ladder, including the exact finest level.
     #[arg(long, value_parser = clap::value_parser!(u8).range(1..))]
     levels: Option<u8>,
-    /// Finest candidate voxel edge in the LAS coordinate reference system.
-    /// Defaults to the largest LAS quantization scale.
-    #[arg(long)]
-    base_voxel_size: Option<f64>,
+    /// Per-axis voxel edge ratio between adjacent levels.
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u32).range(2..))]
+    voxel_edge_ratio: u32,
     /// Approximate upper bound for points in automatically generated L0.
     #[arg(long, default_value_t = 8_192)]
     coarse_points: usize,
@@ -35,7 +35,7 @@ struct Args {
     #[arg(long, default_value_t = 65_536)]
     row_group_size: usize,
     /// Maximum rows per Parquet data page. Smaller pages improve bbox pruning.
-    #[arg(long, default_value_t = 8_192)]
+    #[arg(long, default_value_t = 4_096)]
     page_row_count: usize,
     /// Ordering applied within each data page after STR fixes its spatial membership.
     #[arg(long, value_enum, default_value_t = PageOrderArg::Spatial)]
@@ -86,6 +86,7 @@ impl From<IntensityEncodingArg> for IntensityEncoding {
 
 #[derive(Serialize)]
 struct Summary {
+    input_files: usize,
     input_points: usize,
     output_bytes: u64,
     bytes_per_point: f64,
@@ -95,8 +96,7 @@ struct Summary {
     intensity_encoding: &'static str,
     zstd_level: i32,
     coarse_points: usize,
-    base_voxel_size: f64,
-    coarsest_voxel_size: f64,
+    voxel_edge_ratio: u32,
     level_points: Vec<usize>,
     elapsed_seconds: f64,
 }
@@ -113,46 +113,31 @@ fn main() -> Result<()> {
         bail!("--coarse-points must be greater than zero");
     }
     let started = Instant::now();
-    let mut reader = Reader::from_path(&args.input)
-        .with_context(|| format!("failed to open LAS/LAZ input {}", args.input.display()))?;
-    let transforms = *reader.header().transforms();
-    let source_bounds = reader.header().bounds();
-    let point_format = *reader.header().point_format();
-    let point_data = reader
-        .read_all()
-        .context("failed to decode LAS/LAZ points")?;
-    let (points, attributes) = LasAttributes::extract(&point_data)?;
-    drop(point_data);
+    let inputs = read_inputs(&args.inputs)?;
+    let points = inputs.points;
+    let attributes = inputs.attributes;
     let Some(integer_bounds) = IntegerBounds::from_points(&points) else {
-        bail!("input contains no points");
+        bail!("inputs contain no points");
     };
 
-    let scales = [transforms.x.scale, transforms.y.scale, transforms.z.scale];
-    let base_voxel_size = args
-        .base_voxel_size
-        .unwrap_or_else(|| scales.into_iter().fold(f64::NEG_INFINITY, f64::max));
-    if !base_voxel_size.is_finite() || base_voxel_size <= 0.0 {
-        bail!("--base-voxel-size must be finite and greater than zero");
-    }
+    let scales = inputs.scales;
     let requested_levels = args.levels.unwrap_or_else(|| {
         automatic_level_count_for_target(
             &points,
             integer_bounds,
-            scales,
-            base_voxel_size,
+            args.voxel_edge_ratio,
             args.coarse_points,
         )
     });
-    let coarsest_voxel_size = coarsest_voxel_size(requested_levels, base_voxel_size);
 
     let mut levels = build_levels(
         points,
         requested_levels,
-        base_voxel_size,
-        scales,
+        args.voxel_edge_ratio,
         integer_bounds,
     );
     pack_levels(&mut levels, args.row_group_size);
+    pack_pages(&mut levels, args.row_group_size, args.page_row_count);
     let page_order = PageOrder::from(args.page_order);
     reorder_pages(
         &mut levels,
@@ -165,36 +150,21 @@ fn main() -> Result<()> {
     let metadata = PointCloudMetadata {
         version: "0.1.0".to_owned(),
         scale: scales,
-        offset: [
-            transforms.x.offset,
-            transforms.y.offset,
-            transforms.z.offset,
-        ],
+        offset: [inputs.offsets[0], inputs.offsets[1], inputs.offsets[2]],
         bounds: [
-            source_bounds.min.x,
-            source_bounds.min.y,
-            source_bounds.min.z,
-            source_bounds.max.x,
-            source_bounds.max.y,
-            source_bounds.max.z,
+            f64::from(integer_bounds.min.x) * scales[0] + inputs.offsets[0],
+            f64::from(integer_bounds.min.y) * scales[1] + inputs.offsets[1],
+            f64::from(integer_bounds.min.z) * scales[2] + inputs.offsets[2],
+            f64::from(integer_bounds.max.x) * scales[0] + inputs.offsets[0],
+            f64::from(integer_bounds.max.y) * scales[1] + inputs.offsets[1],
+            f64::from(integer_bounds.max.z) * scales[2] + inputs.offsets[2],
         ],
         level_row_group_ends: build_level_row_group_ends(
             level_points.iter().copied(),
             args.row_group_size,
         ),
-        base_voxel_size,
-        coarsest_voxel_size,
-        hierarchy: "additive_voxel_first".to_owned(),
-        spatial_order: if page_order == PageOrder::Spatial {
-            "str_3d_row_group".to_owned()
-        } else {
-            format!("str_3d_row_group+{}_page", page_order.name())
-        },
-        source_las: SourceLasMetadata {
-            point_format: point_format.to_u8()?,
-            extra_bytes_per_point: point_format.extra_bytes,
-            scan_angle_scale: if point_format.is_extended { 0.006 } else { 1.0 },
-        },
+        voxel_edge_ratio: args.voxel_edge_ratio,
+        crs: inputs.crs,
     };
     write_parquet(
         &args.output,
@@ -210,6 +180,7 @@ fn main() -> Result<()> {
     let output_bytes = std::fs::metadata(&args.output)?.len();
     let input_points = levels.iter().map(|level| level.points.len()).sum::<usize>();
     let summary = Summary {
+        input_files: args.inputs.len(),
         input_points,
         output_bytes,
         bytes_per_point: output_bytes as f64 / input_points as f64,
@@ -219,8 +190,7 @@ fn main() -> Result<()> {
         intensity_encoding: IntensityEncoding::from(args.intensity_encoding).name(),
         zstd_level: args.zstd_level,
         coarse_points: args.coarse_points,
-        base_voxel_size,
-        coarsest_voxel_size,
+        voxel_edge_ratio: args.voxel_edge_ratio,
         level_points,
         elapsed_seconds: started.elapsed().as_secs_f64(),
     };

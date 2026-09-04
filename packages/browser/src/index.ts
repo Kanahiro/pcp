@@ -16,15 +16,8 @@ export interface PointCloudMetadata {
   offset: [number, number, number];
   bounds: [number, number, number, number, number, number];
   level_row_group_ends: number[];
-  base_voxel_size: number;
-  coarsest_voxel_size?: number;
-  hierarchy: string;
-  spatial_order: string;
-  source_las?: {
-    point_format: number;
-    extra_bytes_per_point: number;
-    scan_angle_scale: number;
-  };
+  voxel_edge_ratio: number;
+  crs: Record<string, unknown> | null;
 }
 
 export interface QuantizedBounds {
@@ -50,7 +43,6 @@ export interface ResolutionInfo {
   rowStart: number;
   rowEnd: number;
   pointCount: number;
-  voxelSize: number;
   geometricError: number;
   worldBounds: WorldBounds | null;
 }
@@ -342,11 +334,8 @@ function isPointCloudMetadata(value: unknown): value is PointCloudMetadata {
     isNumberTuple(item.bounds, 6) &&
     Array.isArray(item.level_row_group_ends) && item.level_row_group_ends.length > 0 &&
       item.level_row_group_ends.every(isNonNegativeInteger) &&
-    typeof item.base_voxel_size === "number" && item.base_voxel_size > 0 &&
-    (item.coarsest_voxel_size === undefined ||
-      (typeof item.coarsest_voxel_size === "number" && item.coarsest_voxel_size > 0)) &&
-    typeof item.hierarchy === "string" &&
-    typeof item.spatial_order === "string"
+    Number.isInteger(item.voxel_edge_ratio) && Number(item.voxel_edge_ratio) >= 2 &&
+    (item.crs === null || (typeof item.crs === "object" && !Array.isArray(item.crs)))
   );
 }
 
@@ -482,9 +471,7 @@ function buildSpatialRowGroups(rowGroups: RowGroup[], metadata: PointCloudMetada
       pointCount,
       rowStart,
       rowEnd: rowStart + pointCount,
-      geometricError: resolution === lastResolution
-        ? 0
-        : voxelSizeAt(metadata, resolution) * Math.sqrt(3),
+      geometricError: resolution === lastResolution ? 0 : voxelDiagonalAt(metadata, resolution),
       quantizedBounds,
       worldBounds: decodeBounds(quantizedBounds, metadata),
     };
@@ -511,10 +498,9 @@ function buildResolutionInfo(
       rowStart,
       rowEnd,
       pointCount,
-      voxelSize: voxelSizeAt(metadata, resolution),
       geometricError: resolution === levelCount - 1
         ? 0
-        : voxelSizeAt(metadata, resolution) * Math.sqrt(3),
+        : voxelDiagonalAt(metadata, resolution),
       worldBounds: unionBounds(groups.map((group) => group.worldBounds)),
     };
     rowGroupStart = rowGroupEnd;
@@ -523,10 +509,9 @@ function buildResolutionInfo(
   });
 }
 
-function voxelSizeAt(metadata: PointCloudMetadata, resolution: number): number {
-  const coarsest = metadata.coarsest_voxel_size
-    ?? metadata.base_voxel_size * 2 ** (metadata.level_row_group_ends.length - 1);
-  return coarsest / 2 ** resolution;
+function voxelDiagonalAt(metadata: PointCloudMetadata, resolution: number): number {
+  const exponent = metadata.level_row_group_ends.length - 1 - resolution;
+  return Math.hypot(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
 }
 
 function rowGroupBounds(rowGroup: RowGroup): QuantizedBounds {

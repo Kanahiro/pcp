@@ -8,9 +8,8 @@ const metadata: PointCloudMetadata = {
   offset: [100, 200, 300],
   bounds: [100, 200, 300, 110, 210, 310],
   level_row_group_ends: [1],
-  base_voxel_size: 0.01,
-  hierarchy: "additive",
-  spatial_order: "hilbert-3d",
+  voxel_edge_ratio: 2,
+  crs: null,
 };
 
 describe("buildPointBuffers", () => {
