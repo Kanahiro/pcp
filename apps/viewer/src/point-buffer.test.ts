@@ -14,15 +14,16 @@ const metadata: PointCloudMetadata = {
 };
 
 describe("buildPointBuffers", () => {
-  it("decodes quantized positions relative to the dataset origin", () => {
-    const point: QuantizedPoint = { resolution: 0, x: 100, y: 200, z: 300, red: null, green: null, blue: null };
-    const result = buildPointBuffers([point], metadata, [100, 200, 300], "elevation");
-    expect(Array.from(result.positions)).toEqual([1, 2, 3]);
+  it("keeps Parquet coordinates quantized for the integer GPU attribute", () => {
+    const point: QuantizedPoint = { resolution: 0, x: -123, y: 456, z: 789, red: null, green: null, blue: null };
+    const result = buildPointBuffers([point], metadata, "elevation");
+    expect(result.quantizedPositions).toBeInstanceOf(Int32Array);
+    expect(Array.from(result.quantizedPositions)).toEqual([-123, 456, 789]);
   });
 
   it("uses LAS 16-bit RGB values", () => {
     const point: QuantizedPoint = { resolution: 0, x: 0, y: 0, z: 0, red: 65_535, green: 0, blue: 32_768 };
-    const result = buildPointBuffers([point], metadata, [100, 200, 300], "rgb");
+    const result = buildPointBuffers([point], metadata, "rgb");
     expect(result.colors[0]).toBeCloseTo(1);
     expect(result.colors[1]).toBe(0);
     expect(result.colors[2]).toBeCloseTo(srgbToLinear(32_768 / 65_535));
@@ -35,4 +36,3 @@ describe("elevationColor", () => {
     expect(elevationColor(2)).toEqual(elevationColor(1));
   });
 });
-

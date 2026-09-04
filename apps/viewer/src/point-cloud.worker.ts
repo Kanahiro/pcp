@@ -46,10 +46,10 @@ async function handle(request: WorkerRequest): Promise<void> {
     const renderedChunks = new Map<number, QuantizedPoint[]>();
     const emitChunk = ({ rowGroupIndex, points }: { rowGroupIndex: number; points: QuantizedPoint[] }) => {
       if (points.length > 0) renderedChunks.set(rowGroupIndex, points);
-      const buffers = buildPointBuffers(points, cloud!.metadata, request.origin, request.colorMode);
+      const buffers = buildPointBuffers(points, cloud!.metadata, request.colorMode);
       respond(
         { id: request.id, ok: true, kind: "query-chunk", payload: { rowGroupIndex, ...buffers } },
-        [buffers.positions.buffer, buffers.colors.buffer],
+        [buffers.quantizedPositions.buffer, buffers.colors.buffer],
       );
     };
     const result = request.kind === "query-level"
@@ -68,7 +68,7 @@ async function handle(request: WorkerRequest): Promise<void> {
 
   const colorChunks = [...lastPointChunks].map(([rowGroupIndex, points]) => ({
     rowGroupIndex,
-    colors: buildPointBuffers(points, cloud!.metadata, [0, 0, 0], request.colorMode).colors,
+    colors: buildPointBuffers(points, cloud!.metadata, request.colorMode).colors,
   }));
   const payload: RecoloredPoints = { colorChunks };
   respond(
@@ -80,4 +80,3 @@ async function handle(request: WorkerRequest): Promise<void> {
 function respond(message: WorkerResponse, transfer: Transferable[] = []): void {
   self.postMessage(message, { transfer });
 }
-

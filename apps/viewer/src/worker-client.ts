@@ -50,22 +50,20 @@ export class PointCloudWorkerClient {
   query(
     bounds: WorldBounds,
     resolution: number,
-    origin: [number, number, number],
     colorMode: ColorMode,
     onChunk?: (chunk: RenderedChunk) => void,
   ): Promise<RenderedQuery> {
-    return this.send({ kind: "query-level", bounds, resolution, origin, colorMode }, onChunk);
+    return this.send({ kind: "query-level", bounds, resolution, colorMode }, onChunk);
   }
 
   queryRowGroups(
     bounds: WorldBounds,
     rowGroupIndices: number[],
-    origin: [number, number, number],
     colorMode: ColorMode,
     onChunk?: (chunk: RenderedChunk) => void,
   ): Promise<RenderedQuery> {
     return this.send(
-      { kind: "query-row-groups", bounds, rowGroupIndices, origin, colorMode },
+      { kind: "query-row-groups", bounds, rowGroupIndices, colorMode },
       onChunk,
     );
   }
@@ -87,4 +85,3 @@ export class PointCloudWorkerClient {
     });
   }
 }
-

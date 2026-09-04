@@ -1,9 +1,10 @@
-import type { QueryMetrics, WorldBounds } from "@pointcloud-parquet/browser";
+import type { QuantizedBounds, QueryMetrics, WorldBounds } from "@pointcloud-parquet/browser";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import "./style.css";
 import { BoundingBoxLayers } from "./bbox-layer";
 import type { ColorMode } from "./point-buffer";
+import { QuantizedPointMaterial } from "./point-material";
 import { selectRowGroupsBySse, type SpatialSseSelection } from "./sse";
 import { PointCloudWorkerClient } from "./worker-client";
 import type { CloudDescription, RenderedChunk } from "./worker-protocol";
@@ -140,7 +141,7 @@ controls.addEventListener("change", requestRender);
 const workerClient = new PointCloudWorkerClient();
 let cloud: CloudDescription | null = null;
 const pointObjects = new Map<number, THREE.Points>();
-let pointMaterial: THREE.PointsMaterial | null = null;
+let pointMaterial: QuantizedPointMaterial | null = null;
 let boundingBoxes: BoundingBoxLayers | null = null;
 let origin: [number, number, number] = [0, 0, 0];
 let fullBounds: WorldBounds | null = null;
@@ -265,7 +266,7 @@ async function queryAndRender(options: {
     const onChunk = (chunk: RenderedChunk) => {
       loadedGroups += 1;
       loadedGroupIndices.push(chunk.rowGroupIndex);
-      if (replaceRenderedChunk(chunk.rowGroupIndex, chunk.positions, chunk.colors)) {
+      if (replaceRenderedChunk(chunk, bounds)) {
         visibleGroupIndices.push(chunk.rowGroupIndex);
       }
       boundingBoxes?.setSelectedRowGroups([...pointObjects.keys()]);
@@ -279,11 +280,10 @@ async function queryAndRender(options: {
       ? await workerClient.queryRowGroups(
           bounds,
           options.rowGroupIndices,
-          origin,
           selectedColorMode(),
           onChunk,
         )
-      : await workerClient.query(bounds, resolution, origin, selectedColorMode(), onChunk);
+      : await workerClient.query(bounds, resolution, selectedColorMode(), onChunk);
     loadedSelectionKey = options.selectionKey ?? `level:${resolution}:${boundsKey(bounds)}`;
     retainRenderedGroups(new Set(visibleGroupIndices));
     boundingBoxes?.setSelectedRowGroups(loadedGroupIndices);
@@ -313,37 +313,71 @@ function clearRenderedPoints(): void {
 }
 
 function replaceRenderedChunk(
-  rowGroupIndex: number,
-  positions: Float32Array,
-  colors: Float32Array,
+  chunk: RenderedChunk,
+  queryBounds: WorldBounds,
 ): boolean {
+  const { rowGroupIndex, quantizedPositions, colors } = chunk;
   const previous = pointObjects.get(rowGroupIndex);
   if (previous) {
     cloudGroup.remove(previous);
     previous.geometry.dispose();
     pointObjects.delete(rowGroupIndex);
   }
-  if (positions.length === 0) {
+  if (quantizedPositions.length === 0) {
     requestRender();
     return false;
   }
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const position = new THREE.BufferAttribute(quantizedPositions, 3);
+  position.gpuType = THREE.IntType;
+  geometry.setAttribute("position", position);
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  pointMaterial ??= new THREE.PointsMaterial({
-      size: Number(element<HTMLInputElement>("point-size").value),
-      vertexColors: true,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: 0.96,
-    });
+  setGeometryBounds(geometry, rowGroupIndex, queryBounds);
+  pointMaterial ??= createPointMaterial();
   const object = new THREE.Points(geometry, pointMaterial);
   pointObjects.set(rowGroupIndex, object);
   cloudGroup.add(object);
   requestRender();
   return true;
+}
+
+function createPointMaterial(): QuantizedPointMaterial {
+  if (!cloud) throw new Error("point cloud metadata is not available");
+  const quantizedBounds = cloud.rowGroups.reduce<QuantizedBounds>((union, group) => ({
+    min: union.min.map((value, axis) => Math.min(value, group.quantizedBounds.min[axis]!)) as [number, number, number],
+    max: union.max.map((value, axis) => Math.max(value, group.quantizedBounds.max[axis]!)) as [number, number, number],
+  }), {
+    min: [...cloud.rowGroups[0]!.quantizedBounds.min] as [number, number, number],
+    max: [...cloud.rowGroups[0]!.quantizedBounds.max] as [number, number, number],
+  });
+  const material = new QuantizedPointMaterial(
+    cloud.metadata,
+    origin,
+    quantizedBounds,
+    Number(element<HTMLInputElement>("point-size").value),
+  );
+  material.viewportScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
+  return material;
+}
+
+function setGeometryBounds(
+  geometry: THREE.BufferGeometry,
+  rowGroupIndex: number,
+  queryBounds: WorldBounds,
+): void {
+  const groupBounds = cloud!.rowGroups[rowGroupIndex]!.worldBounds;
+  const minimum = new THREE.Vector3(
+    Math.max(groupBounds.min[0], queryBounds.min[0]) - origin[0],
+    Math.max(groupBounds.min[1], queryBounds.min[1]) - origin[1],
+    Math.max(groupBounds.min[2], queryBounds.min[2]) - origin[2],
+  );
+  const maximum = new THREE.Vector3(
+    Math.min(groupBounds.max[0], queryBounds.max[0]) - origin[0],
+    Math.min(groupBounds.max[1], queryBounds.max[1]) - origin[1],
+    Math.min(groupBounds.max[2], queryBounds.max[2]) - origin[2],
+  );
+  geometry.boundingBox = new THREE.Box3(minimum, maximum);
+  geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new THREE.Sphere());
 }
 
 function retainRenderedGroups(indices: Set<number>): void {
@@ -424,7 +458,7 @@ async function recolor(): Promise<void> {
 function updatePointSize(): void {
   const value = element<HTMLInputElement>("point-size").value;
   element<HTMLOutputElement>("point-size-value").value = value;
-  if (pointMaterial) pointMaterial.size = Number(value);
+  if (pointMaterial) pointMaterial.pointSize = Number(value);
   requestRender();
 }
 
@@ -597,6 +631,9 @@ function resize(): void {
   const { clientWidth, clientHeight } = viewport;
   if (clientWidth === 0 || clientHeight === 0) return;
   renderer.setSize(clientWidth, clientHeight, false);
+  if (pointMaterial) {
+    pointMaterial.viewportScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
+  }
   camera.aspect = clientWidth / clientHeight;
   camera.updateProjectionMatrix();
   requestRender();

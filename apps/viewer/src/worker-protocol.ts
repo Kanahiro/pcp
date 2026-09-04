@@ -21,7 +21,7 @@ export interface RenderedQuery {
 
 export interface RenderedChunk {
   rowGroupIndex: number;
-  positions: Float32Array;
+  quantizedPositions: Int32Array;
   colors: Float32Array;
 }
 
@@ -35,14 +35,12 @@ export type WorkerCommand =
       kind: "query-level";
       bounds: WorldBounds;
       resolution: number;
-      origin: [number, number, number];
       colorMode: ColorMode;
     }
   | {
       kind: "query-row-groups";
       bounds: WorldBounds;
       rowGroupIndices: number[];
-      origin: [number, number, number];
       colorMode: ColorMode;
     }
   | { kind: "recolor"; colorMode: ColorMode };
@@ -53,4 +51,3 @@ export type WorkerResponse =
   | { id: number; ok: true; kind: "result"; payload: CloudDescription | RenderedQuery | RecoloredPoints }
   | { id: number; ok: true; kind: "query-chunk"; payload: RenderedChunk }
   | { id: number; ok: false; error: string };
-

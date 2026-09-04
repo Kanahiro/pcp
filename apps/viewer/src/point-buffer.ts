@@ -3,7 +3,7 @@ import type { PointCloudMetadata, QuantizedPoint } from "@pointcloud-parquet/bro
 export type ColorMode = "rgb" | "elevation" | "resolution";
 
 export interface PointBuffers {
-  positions: Float32Array;
+  quantizedPositions: Int32Array;
   colors: Float32Array;
 }
 
@@ -25,30 +25,30 @@ export function resolutionColor(resolution: number): readonly [number, number, n
 export function buildPointBuffers(
   points: QuantizedPoint[],
   metadata: PointCloudMetadata,
-  origin: readonly [number, number, number],
   colorMode: ColorMode,
 ): PointBuffers {
-  const positions = new Float32Array(points.length * 3);
+  const quantizedPositions = new Int32Array(points.length * 3);
   const colors = new Float32Array(points.length * 3);
-  const zMin = metadata.bounds[2];
-  const zSpan = Math.max(metadata.bounds[5] - zMin, Number.EPSILON);
+  const quantizedZMin = (metadata.bounds[2] - metadata.offset[2]) / metadata.scale[2];
+  const quantizedZSpan = Math.max(
+    (metadata.bounds[5] - metadata.bounds[2]) / metadata.scale[2],
+    Number.EPSILON,
+  );
 
   for (let index = 0; index < points.length; index += 1) {
     const point = points[index]!;
     const offset = index * 3;
-    const x = point.x * metadata.scale[0] + metadata.offset[0];
-    const y = point.y * metadata.scale[1] + metadata.offset[1];
-    const z = point.z * metadata.scale[2] + metadata.offset[2];
-    positions[offset] = x - origin[0];
-    positions[offset + 1] = y - origin[1];
-    positions[offset + 2] = z - origin[2];
+    quantizedPositions[offset] = point.x;
+    quantizedPositions[offset + 1] = point.y;
+    quantizedPositions[offset + 2] = point.z;
 
-    const color = colorForPoint(point, colorMode, (z - zMin) / zSpan);
+    const normalizedHeight = (point.z - quantizedZMin) / quantizedZSpan;
+    const color = colorForPoint(point, colorMode, normalizedHeight);
     colors[offset] = color[0];
     colors[offset + 1] = color[1];
     colors[offset + 2] = color[2];
   }
-  return { positions, colors };
+  return { quantizedPositions, colors };
 }
 
 function colorForPoint(
@@ -92,4 +92,3 @@ export function elevationColor(value: number): readonly [number, number, number]
     left[3] + (right[3] - left[3]) * mix,
   ];
 }
-
