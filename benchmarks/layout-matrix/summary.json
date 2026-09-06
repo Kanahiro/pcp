@@ -1,0 +1,649 @@
+{
+  "benchmark": "point-cloud-parquet-layout-matrix",
+  "measuredAt": {
+    "first": "2026-09-06T08:34:27.319Z",
+    "last": "2026-09-06T08:40:05.690Z"
+  },
+  "validation": {
+    "sourceFiles": 12,
+    "consistentBenchmarkConditions": true,
+    "deterministicRerunIo": true
+  },
+  "baselineConfig": "64K/4K",
+  "paretoMetrics": [
+    "fileBytes",
+    "transferBytes",
+    "rangeCalls"
+  ],
+  "paretoConfigs": [
+    "256K/2K",
+    "256K/4K",
+    "256K/8K"
+  ],
+  "configurations": [
+    {
+      "config": "64K/2K",
+      "rowGroupSize": 65536,
+      "pageRowCount": 2048,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg65536-pg2048.json"
+      ],
+      "fileBytes": 109414580,
+      "rowGroups": 116,
+      "transferBytes": 39680637,
+      "rangeCalls": 302,
+      "maxQueryCalls": 74,
+      "candidatePoints": 6748438,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2024.5551670000004,
+        "min": 2024.5551670000004,
+        "max": 2024.5551670000004
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.657061285806285,
+        "min": 0.657061285806285,
+        "max": 0.657061285806285
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4984920,
+          "rangeCalls": 74,
+          "candidatePoints": 1125827,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2514879,
+          "rangeCalls": 66,
+          "candidatePoints": 816014,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 6362259,
+          "rangeCalls": 42,
+          "candidatePoints": 994755,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 11837985,
+          "rangeCalls": 56,
+          "candidatePoints": 1771990,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13980594,
+          "rangeCalls": 64,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": 0.025499672333718637,
+        "transferBytes": 0.07122749388650185,
+        "rangeCalls": -0.08484848484848484,
+        "candidatePoints": 0
+      }
+    },
+    {
+      "config": "64K/4K",
+      "rowGroupSize": 65536,
+      "pageRowCount": 4096,
+      "benchmarkRuns": 2,
+      "sourceFiles": [
+        "rg65536-pg4096-rerun.json",
+        "rg65536-pg4096.json"
+      ],
+      "fileBytes": 106693920,
+      "rowGroups": 116,
+      "transferBytes": 37042213,
+      "rangeCalls": 330,
+      "maxQueryCalls": 70,
+      "candidatePoints": 6748438,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2527.477584000001,
+        "min": 2128.3369589999998,
+        "max": 2926.618209000002
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.6805694228863179,
+        "min": 0.6652061092074413,
+        "max": 0.6959327365651947
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4851440,
+          "rangeCalls": 70,
+          "candidatePoints": 1125827,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2634798,
+          "rangeCalls": 65,
+          "candidatePoints": 816014,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5088861,
+          "rangeCalls": 65,
+          "candidatePoints": 994755,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10857526,
+          "rangeCalls": 66,
+          "candidatePoints": 1771990,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13609588,
+          "rangeCalls": 64,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": 0,
+        "transferBytes": 0,
+        "rangeCalls": 0,
+        "candidatePoints": 0
+      }
+    },
+    {
+      "config": "64K/8K",
+      "rowGroupSize": 65536,
+      "pageRowCount": 8192,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg65536-pg8192.json"
+      ],
+      "fileBytes": 105852015,
+      "rowGroups": 116,
+      "transferBytes": 38651950,
+      "rangeCalls": 293,
+      "maxQueryCalls": 70,
+      "candidatePoints": 6748438,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2534.1793759999982,
+        "min": 2534.1793759999982,
+        "max": 2534.1793759999982
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.8206340447555897,
+        "min": 0.8206340447555897,
+        "max": 0.8206340447555897
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 5424722,
+          "rangeCalls": 58,
+          "candidatePoints": 1125827,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 3948189,
+          "rangeCalls": 40,
+          "candidatePoints": 816014,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5119981,
+          "rangeCalls": 64,
+          "candidatePoints": 994755,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10523312,
+          "rangeCalls": 70,
+          "candidatePoints": 1771990,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13635746,
+          "rangeCalls": 61,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": -0.007890843264545921,
+        "transferBytes": 0.043456825865128446,
+        "rangeCalls": -0.11212121212121207,
+        "candidatePoints": 0
+      }
+    },
+    {
+      "config": "128K/2K",
+      "rowGroupSize": 131072,
+      "pageRowCount": 2048,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg131072-pg2048.json"
+      ],
+      "fileBytes": 109158259,
+      "rowGroups": 60,
+      "transferBytes": 37604083,
+      "rangeCalls": 340,
+      "maxQueryCalls": 102,
+      "candidatePoints": 7987191,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2062.1830009999994,
+        "min": 2062.1830009999994,
+        "max": 2062.1830009999994
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.6719351225266731,
+        "min": 0.6719351225266731,
+        "max": 0.6719351225266731
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4557839,
+          "rangeCalls": 96,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2717497,
+          "rangeCalls": 45,
+          "candidatePoints": 929219,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5991883,
+          "rangeCalls": 102,
+          "candidatePoints": 1584579,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10586984,
+          "rangeCalls": 55,
+          "candidatePoints": 1777708,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13749880,
+          "rangeCalls": 42,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": 0.023097276770785102,
+        "transferBytes": 0.015168370205095538,
+        "rangeCalls": 0.030303030303030276,
+        "candidatePoints": 0.18356144043999523
+      }
+    },
+    {
+      "config": "128K/4K",
+      "rowGroupSize": 131072,
+      "pageRowCount": 4096,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg131072-pg4096.json"
+      ],
+      "fileBytes": 106448629,
+      "rowGroups": 60,
+      "transferBytes": 37335128,
+      "rangeCalls": 317,
+      "maxQueryCalls": 100,
+      "candidatePoints": 7987191,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2436.7663340000017,
+        "min": 2436.7663340000017,
+        "max": 2436.7663340000017
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.6951438135561177,
+        "min": 0.6951438135561177,
+        "max": 0.6951438135561177
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 5124356,
+          "rangeCalls": 81,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2634045,
+          "rangeCalls": 44,
+          "candidatePoints": 929219,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5886440,
+          "rangeCalls": 100,
+          "candidatePoints": 1584579,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10280176,
+          "rangeCalls": 54,
+          "candidatePoints": 1777708,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13410111,
+          "rangeCalls": 38,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": -0.0022990157264818345,
+        "transferBytes": 0.00790759990500578,
+        "rangeCalls": -0.039393939393939426,
+        "candidatePoints": 0.18356144043999523
+      }
+    },
+    {
+      "config": "128K/8K",
+      "rowGroupSize": 131072,
+      "pageRowCount": 8192,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg131072-pg8192.json"
+      ],
+      "fileBytes": 105235142,
+      "rowGroups": 60,
+      "transferBytes": 35755343,
+      "rangeCalls": 338,
+      "maxQueryCalls": 89,
+      "candidatePoints": 7987191,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2318.146501,
+        "min": 2318.146501,
+        "max": 2318.146501
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.7573680673363621,
+        "min": 0.7573680673363621,
+        "max": 0.7573680673363621
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4791745,
+          "rangeCalls": 89,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2447270,
+          "rangeCalls": 49,
+          "candidatePoints": 929219,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5998889,
+          "rangeCalls": 88,
+          "candidatePoints": 1584579,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10160807,
+          "rangeCalls": 61,
+          "candidatePoints": 1777708,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 12356632,
+          "rangeCalls": 51,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": -0.013672550413369344,
+        "transferBytes": -0.034740634961523464,
+        "rangeCalls": 0.024242424242424176,
+        "candidatePoints": 0.18356144043999523
+      }
+    },
+    {
+      "config": "256K/2K",
+      "rowGroupSize": 262144,
+      "pageRowCount": 2048,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "rg262144-pg2048.json"
+      ],
+      "fileBytes": 108876612,
+      "rowGroups": 34,
+      "transferBytes": 34684886,
+      "rangeCalls": 330,
+      "maxQueryCalls": 105,
+      "candidatePoints": 8582733,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2086.349667000001,
+        "min": 2086.349667000001,
+        "max": 2086.349667000001
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.6733853061147773,
+        "min": 0.6733853061147773,
+        "max": 0.6733853061147773
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 3579939,
+          "rangeCalls": 66,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2207037,
+          "rangeCalls": 43,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4933650,
+          "rangeCalls": 105,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10853059,
+          "rangeCalls": 72,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 13111201,
+          "rangeCalls": 44,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": 0.020457510606040064,
+        "transferBytes": -0.06363893539513954,
+        "rangeCalls": 0,
+        "candidatePoints": 0.2718103063257009
+      }
+    },
+    {
+      "config": "256K/4K",
+      "rowGroupSize": 262144,
+      "pageRowCount": 4096,
+      "benchmarkRuns": 2,
+      "sourceFiles": [
+        "rg262144-pg4096-rerun.json",
+        "rg262144-pg4096.json"
+      ],
+      "fileBytes": 106423533,
+      "rowGroups": 34,
+      "transferBytes": 35799934,
+      "rangeCalls": 281,
+      "maxQueryCalls": 95,
+      "candidatePoints": 8582733,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2483.290479500002,
+        "min": 2259.704500000001,
+        "max": 2706.876459000003
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.7471773643827443,
+        "min": 0.7345457450522556,
+        "max": 0.759808983713233
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4018940,
+          "rangeCalls": 53,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 3281152,
+          "rangeCalls": 37,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4396528,
+          "rangeCalls": 95,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 11277688,
+          "rangeCalls": 56,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 12825626,
+          "rangeCalls": 40,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": -0.002534230629074319,
+        "transferBytes": -0.03353684619220776,
+        "rangeCalls": -0.14848484848484844,
+        "candidatePoints": 0.2718103063257009
+      }
+    },
+    {
+      "config": "256K/8K",
+      "rowGroupSize": 262144,
+      "pageRowCount": 8192,
+      "benchmarkRuns": 2,
+      "sourceFiles": [
+        "rg262144-pg8192-rerun.json",
+        "rg262144-pg8192.json"
+      ],
+      "fileBytes": 105183389,
+      "rowGroups": 34,
+      "transferBytes": 35531008,
+      "rangeCalls": 283,
+      "maxQueryCalls": 92,
+      "candidatePoints": 8582733,
+      "matchedPoints": 1948128,
+      "elapsedMs": {
+        "median": 2523.6595204999985,
+        "min": 2431.713583,
+        "max": 2615.605457999997
+      },
+      "parquetToCopcElapsed": {
+        "median": 0.7928413448353198,
+        "min": 0.7718035449756682,
+        "max": 0.8138791446949715
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4557396,
+          "rangeCalls": 51,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2893941,
+          "rangeCalls": 38,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4863133,
+          "rangeCalls": 92,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10626678,
+          "rangeCalls": 66,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788
+        },
+        {
+          "query": "large",
+          "transferBytes": 12589860,
+          "rangeCalls": 36,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132
+        }
+      ],
+      "vsBaseline": {
+        "fileBytes": -0.014157610855426439,
+        "transferBytes": -0.04079683360170738,
+        "rangeCalls": -0.14242424242424245,
+        "candidatePoints": 0.2718103063257009
+      }
+    }
+  ]
+}

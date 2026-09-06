@@ -63,6 +63,9 @@ fn combines_multiple_las_inputs_into_one_parquet() {
     let summary: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
     assert_eq!(2, summary["input_files"]);
     assert_eq!(5, summary["input_points"]);
+    assert_eq!(262_144, summary["row_group_size"]);
+    assert_eq!(8_192, summary["page_row_count"]);
+    assert_eq!("spatial", summary["page_order"]);
 
     let reader = SerializedFileReader::new(File::open(&output).unwrap()).unwrap();
     assert_eq!(5, reader.metadata().file_metadata().num_rows());

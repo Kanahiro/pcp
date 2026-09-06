@@ -32,10 +32,10 @@ struct Args {
     #[arg(long, default_value_t = 8_192)]
     coarse_points: usize,
     /// Target points per Row Group. Resolution boundaries always end a group.
-    #[arg(long, default_value_t = 65_536)]
+    #[arg(long, default_value_t = 262_144)]
     row_group_size: usize,
     /// Maximum rows per Parquet data page. Smaller pages improve bbox pruning.
-    #[arg(long, default_value_t = 4_096)]
+    #[arg(long, default_value_t = 8_192)]
     page_row_count: usize,
     /// Ordering applied within each data page after STR fixes its spatial membership.
     #[arg(long, value_enum, default_value_t = PageOrderArg::Spatial)]

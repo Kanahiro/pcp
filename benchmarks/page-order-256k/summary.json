@@ -1,0 +1,337 @@
+{
+  "benchmark": "point-cloud-parquet-page-order-256k",
+  "measuredAt": {
+    "first": "2026-09-06T13:08:06.575Z",
+    "last": "2026-09-06T13:10:31.410Z"
+  },
+  "experiment": {
+    "rowGroupSize": 262144,
+    "pageRowCounts": [
+      4096,
+      8192
+    ],
+    "pageOrders": [
+      "hilbert",
+      "spatial"
+    ],
+    "primaryDirectionalityMetric": "absolute Range-call gap between thin-x and thin-y",
+    "rationale": "thin-x and thin-y have similar matched-point counts; thin-z is retained but not used as the primary symmetry metric because it matches about 8-9x more points"
+  },
+  "validation": {
+    "sourceFiles": 6,
+    "consistentBenchmarkConditions": true,
+    "deterministicHilbertRerunIo": true
+  },
+  "configurations": [
+    {
+      "config": "hilbert/4K",
+      "pageOrder": "hilbert",
+      "rowGroupSize": 262144,
+      "pageRowCount": 4096,
+      "benchmarkRuns": 2,
+      "sourceFiles": [
+        "hilbert-pg4096-rerun.json",
+        "hilbert-pg4096.json"
+      ],
+      "fileBytes": 110996728,
+      "transferBytes": 39495780,
+      "rangeCalls": 302,
+      "maxQueryCalls": 109,
+      "elapsedMs": {
+        "median": 2304.278062000002,
+        "min": 2282.7368750000037,
+        "max": 2325.819249000001
+      },
+      "directionality": {
+        "thinXCalls": 38,
+        "thinYCalls": 109,
+        "thinZCalls": 66,
+        "thinXYCallGap": 71,
+        "thinXYCallRatio": 2.8684210526315788,
+        "callRange": 71,
+        "callCoefficientOfVariation": 0.4112740368652728
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4400508,
+          "rangeCalls": 55,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039,
+          "callsPer100kMatched": 32.92644232783961
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 3647841,
+          "rangeCalls": 38,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845,
+          "callsPer100kMatched": 68.04548303339601
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4488970,
+          "rangeCalls": 109,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324,
+          "callsPer100kMatched": 172.13062977701978
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 12312837,
+          "rangeCalls": 66,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788,
+          "callsPer100kMatched": 13.048945407957484
+        },
+        {
+          "query": "large",
+          "transferBytes": 14645624,
+          "rangeCalls": 34,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132,
+          "callsPer100kMatched": 2.9408406652527566
+        }
+      ],
+      "vsSpatial": {
+        "fileBytes": 0.04297165176803519,
+        "transferBytes": 0.10323611211126815,
+        "rangeCalls": 0.07473309608540935,
+        "maxQueryCalls": 0.1473684210526316,
+        "thinXYCallGap": 0.22413793103448265
+      }
+    },
+    {
+      "config": "spatial/4K",
+      "pageOrder": "spatial",
+      "rowGroupSize": 262144,
+      "pageRowCount": 4096,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "spatial-pg4096.json"
+      ],
+      "fileBytes": 106423533,
+      "transferBytes": 35799934,
+      "rangeCalls": 281,
+      "maxQueryCalls": 95,
+      "elapsedMs": {
+        "median": 2211.543793,
+        "min": 2211.543793,
+        "max": 2211.543793
+      },
+      "directionality": {
+        "thinXCalls": 37,
+        "thinYCalls": 95,
+        "thinZCalls": 56,
+        "thinXYCallGap": 58,
+        "thinXYCallRatio": 2.5675675675675675,
+        "callRange": 58,
+        "callCoefficientOfVariation": 0.38526210557940044
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4018940,
+          "rangeCalls": 53,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039,
+          "callsPer100kMatched": 31.729117152281802
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 3281152,
+          "rangeCalls": 37,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845,
+          "callsPer100kMatched": 66.25481242725401
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4396528,
+          "rangeCalls": 95,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324,
+          "callsPer100kMatched": 150.02210852125577
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 11277688,
+          "rangeCalls": 56,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788,
+          "callsPer100kMatched": 11.071832467357865
+        },
+        {
+          "query": "large",
+          "transferBytes": 12825626,
+          "rangeCalls": 40,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132,
+          "callsPer100kMatched": 3.4598125473561843
+        }
+      ],
+      "vsSpatial": {
+        "fileBytes": 0,
+        "transferBytes": 0,
+        "rangeCalls": 0,
+        "maxQueryCalls": 0,
+        "thinXYCallGap": 0
+      }
+    },
+    {
+      "config": "hilbert/8K",
+      "pageOrder": "hilbert",
+      "rowGroupSize": 262144,
+      "pageRowCount": 8192,
+      "benchmarkRuns": 2,
+      "sourceFiles": [
+        "hilbert-pg8192-rerun.json",
+        "hilbert-pg8192.json"
+      ],
+      "fileBytes": 109480763,
+      "transferBytes": 39196226,
+      "rangeCalls": 313,
+      "maxQueryCalls": 105,
+      "elapsedMs": {
+        "median": 2447.6196050000003,
+        "min": 2419.537792000003,
+        "max": 2475.701417999998
+      },
+      "directionality": {
+        "thinXCalls": 41,
+        "thinYCalls": 105,
+        "thinZCalls": 75,
+        "thinXYCallGap": 64,
+        "thinXYCallRatio": 2.5609756097560976,
+        "callRange": 64,
+        "callCoefficientOfVariation": 0.3549080823733498
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 5096929,
+          "rangeCalls": 52,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039,
+          "callsPer100kMatched": 31.130454564502898
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 3155223,
+          "rangeCalls": 41,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845,
+          "callsPer100kMatched": 73.41749485182201
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 5141197,
+          "rangeCalls": 105,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324,
+          "callsPer100kMatched": 165.81390941823005
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 11724302,
+          "rangeCalls": 75,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788,
+          "callsPer100kMatched": 14.82834705449714
+        },
+        {
+          "query": "large",
+          "transferBytes": 14078575,
+          "rangeCalls": 40,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132,
+          "callsPer100kMatched": 3.4598125473561843
+        }
+      ],
+      "vsSpatial": {
+        "fileBytes": 0.040856013871163555,
+        "transferBytes": 0.10315547478979492,
+        "rangeCalls": 0.10600706713780927,
+        "maxQueryCalls": 0.14130434782608692,
+        "thinXYCallGap": 0.18518518518518512
+      }
+    },
+    {
+      "config": "spatial/8K",
+      "pageOrder": "spatial",
+      "rowGroupSize": 262144,
+      "pageRowCount": 8192,
+      "benchmarkRuns": 1,
+      "sourceFiles": [
+        "spatial-pg8192.json"
+      ],
+      "fileBytes": 105183389,
+      "transferBytes": 35531008,
+      "rangeCalls": 283,
+      "maxQueryCalls": 92,
+      "elapsedMs": {
+        "median": 2369.864124999999,
+        "min": 2369.864124999999,
+        "max": 2369.864124999999
+      },
+      "directionality": {
+        "thinXCalls": 38,
+        "thinYCalls": 92,
+        "thinZCalls": 66,
+        "thinXYCallGap": 54,
+        "thinXYCallRatio": 2.4210526315789473,
+        "callRange": 54,
+        "callCoefficientOfVariation": 0.33750684507226997
+      },
+      "queryBreakdown": [
+        {
+          "query": "cube",
+          "transferBytes": 4557396,
+          "rangeCalls": 51,
+          "candidatePoints": 1655833,
+          "matchedPoints": 167039,
+          "callsPer100kMatched": 30.531791976724
+        },
+        {
+          "query": "thin-x",
+          "transferBytes": 2893941,
+          "rangeCalls": 38,
+          "candidatePoints": 1191363,
+          "matchedPoints": 55845,
+          "callsPer100kMatched": 68.04548303339601
+        },
+        {
+          "query": "thin-y",
+          "transferBytes": 4863133,
+          "rangeCalls": 92,
+          "candidatePoints": 1655833,
+          "matchedPoints": 63324,
+          "callsPer100kMatched": 145.2845682521635
+        },
+        {
+          "query": "thin-z",
+          "transferBytes": 10626678,
+          "rangeCalls": 66,
+          "candidatePoints": 2039852,
+          "matchedPoints": 505788,
+          "callsPer100kMatched": 13.048945407957484
+        },
+        {
+          "query": "large",
+          "transferBytes": 12589860,
+          "rangeCalls": 36,
+          "candidatePoints": 2039852,
+          "matchedPoints": 1156132,
+          "callsPer100kMatched": 3.113831292620566
+        }
+      ],
+      "vsSpatial": {
+        "fileBytes": 0,
+        "transferBytes": 0,
+        "rangeCalls": 0,
+        "maxQueryCalls": 0,
+        "thinXYCallGap": 0
+      }
+    }
+  ]
+}

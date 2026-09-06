@@ -49,8 +49,8 @@ cargo run --release -p pcp-convert -- \
   ./src/*.laz --output points.parquet \
   --coarse-points 8192 \
   --voxel-edge-ratio 2 \
-  --row-group-size 65536 \
-  --page-row-count 4096 \
+  --row-group-size 262144 \
+  --page-row-count 8192 \
   --zstd-level 9
 ```
 
@@ -58,7 +58,7 @@ resolutionを決定した後、各levelをRow Group容量を葉サイズとす�
 
 XYZとintensityには `DELTA_BINARY_PACKED`、GPS timeには `BYTE_STREAM_SPLIT` を明示します。RGBやscan angleなど、実測でdictionaryの方が小さかった列はwriterのdictionary encodingを維持します。全列の後段圧縮はZSTD level 9です。圧縮パラメータの比較根拠と測定条件は [圧縮・ストリーミング比較](benchmarks/compression-study.md) にまとめています。
 
-`--page-order` はnested STRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
+既定のlayoutは256K Row Group、8K rows/pageです。`--page-order` はnested STRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
 
 voxelは物理空間の立方体として構築します。最細の一辺は3軸の `max(scale)` から導出し、levelを1段粗くしたときの辺長比は `--voxel-edge-ratio`（既定2）で指定します。総level数をN、level番号をrとすると、一辺は `max(scale) * ratio^(N - 1 - r)`、対角長はその `√3` 倍です。`--levels` を省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小のratio冪を選びます。最終levelは残点をすべて格納してexactにし、全点は重複も欠落もなくちょうど1 levelへ所属します。
 
