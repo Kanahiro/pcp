@@ -50,6 +50,8 @@ vec3 linearToSrgb(vec3 value) {
 
 void main() {
   if (outputMode == 1) {
+    vec2 pointOffset = gl_PointCoord - vec2(0.5);
+    if (dot(pointOffset, pointOffset) > 0.25) discard;
     outputColor = vec4(vertexColor, 1.0);
     return;
   }
