@@ -1,4 +1,4 @@
-import type { WorldBounds } from "@pointcloud-parquet/browser";
+import type { SpatialPage, WorldBounds } from "@pointcloud-parquet/browser";
 import type { ColorMode } from "../point-buffer";
 import type {
   CloudDescription,
@@ -12,6 +12,7 @@ import type {
 /** Streaming boundary used by the viewer; Parquet and Worker details stay behind it. */
 export interface PointCloudReader {
   open(url: string): Promise<CloudDescription>;
+  pageBounds(): Promise<SpatialPage[]>;
   readLevel(
     bounds: WorldBounds,
     resolution: number,
@@ -64,6 +65,10 @@ export class ParquetPointCloudReader implements PointCloudReader {
 
   open(url: string): Promise<CloudDescription> {
     return this.send({ kind: "open", url });
+  }
+
+  pageBounds(): Promise<SpatialPage[]> {
+    return this.send({ kind: "page-bounds" });
   }
 
   readLevel(

@@ -124,7 +124,7 @@ pnpm dev:viewer
 
 `main`へのpush時は `.github/workflows/deploy-pages.yml` がViewerをbuildし、GitHub Pagesへ自動deployします。初回だけrepositoryの **Settings → Pages → Build and deployment → Source** で **GitHub Actions** を選択してください。手動再deployはActions画面の `Deploy demo to GitHub Pages` から実行できます。
 
-LODはデフォルトでRow Group単位に自動選択します。各levelのvoxel対角長を幾何誤差の上限とし、各Row Groupのbboxまでのカメラ距離とvertical FOVからscreen-space error（投影pixel幅）へ変換します。L0を基底として常に読み、閾値を超えた候補をSSEの大きい順にpoint budgetまで追加します。カメラを内包するRow Groupは全levelで必須とし、必要ならpoint budgetを超えて読みます。WorkerがHTTP Range取得・Page Index pruning・ZSTD展開・属性変換・bbox filterを行います。画面の `L0 3/3 · L1 4/12` 表示はlevelごとの選択数です。Row Group bboxは全boxを単一LineSegmentsへ集約し、選択中の領域を別の明線で表示します。
+LODはデフォルトでRow Group単位に自動選択します。camera frustumとquery bboxの両方に交差するRow Groupだけを候補とし、各levelのvoxel対角長を幾何誤差の上限として、bbox上のカメラ最近点までの距離とvertical FOVからscreen-space error（投影pixel幅）へ変換します。L0を基底として常に読み、閾値を超えた候補をSSEの大きい順にpoint budgetまで追加します。カメラを内包するRow Groupは全levelで必須とし、必要ならpoint budgetを超えて読みます。WorkerがHTTP Range取得・Page Index pruning・ZSTD展開・属性変換・bbox filterを行います。画面の `L0 3/3 · L1 4/12` 表示はlevelごとの選択数です。Page bboxはオンにした時だけXYZのPage Indexから遅延構築します。PageとRow Groupのbboxは未読領域を薄線、現在のqueryで読み込んだ領域を明線で表示します。
 
 現時点の幾何誤差は元のgrid samplingから得られる保守的な上限で、点群から測定したHausdorff誤差ではありません。またRow Group間に親子関係を保存していないため、これはoctree traversalではなく、Parquet statisticsのbboxを使った独立選択です。Automatic LODを無効にするとlevel sliderでL0から指定levelまでを固定表示できます。座標は描画時にdataset中心を引いてからFloat32へ変換するため、大きな測地座標でも表示精度を保ちます。
 

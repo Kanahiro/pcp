@@ -93,10 +93,10 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
           <fieldset class="bbox-fieldset">
             <legend>Spatial bounds</legend>
             <div class="segmented two-up" id="bbox-mode">
-              <label><input id="show-level-bounds" type="checkbox"><span>Level bbox</span></label>
-              <label><input id="show-row-group-bounds" type="checkbox"><span>Row Groups</span></label>
+              <label><input id="show-page-bounds" type="checkbox"><span>Page bbox</span></label>
+              <label><input id="show-row-group-bounds" type="checkbox"><span>Row Group bbox</span></label>
             </div>
-            <small class="bbox-legend">Bright: selected · Faint: available</small>
+            <small class="bbox-legend">Bright: loaded · Faint: available</small>
           </fieldset>
         </section>
 
@@ -154,6 +154,7 @@ const pointCloudReader = new ParquetPointCloudReader();
 let cloud: CloudDescription | null = null;
 let pointCloudRenderer: PointCloudRenderer | null = null;
 let boundingBoxes: BoundingBoxLayers | null = null;
+let loadingPageBounds: BoundingBoxLayers | null = null;
 let origin: [number, number, number] = [0, 0, 0];
 let fullBounds: WorldBounds | null = null;
 let isBusy = false;
@@ -212,7 +213,9 @@ element<HTMLInputElement>("point-size").addEventListener("input", updatePointSiz
 element<HTMLDivElement>("surface-mode").addEventListener("change", updateSurfaceMode);
 element<HTMLInputElement>("mesh-edge").addEventListener("input", updateSurfaceMode);
 element<HTMLDivElement>("color-mode").addEventListener("change", recolor);
-element<HTMLInputElement>("show-level-bounds").addEventListener("change", updateBoundingBoxes);
+element<HTMLInputElement>("show-page-bounds").addEventListener("change", () => {
+  void updateBoundingBoxes();
+});
 element<HTMLInputElement>("show-row-group-bounds").addEventListener("change", updateBoundingBoxes);
 element<HTMLButtonElement>("reset-bounds").addEventListener("click", () => {
   if (fullBounds) setBoundsInputs(fullBounds);
@@ -289,7 +292,7 @@ async function queryAndRender(options: {
       ?? Array.from({ length: cloud.metadata.level_row_group_ends[resolution]! }, (_, index) => index);
     const loadedGroupIndices: number[] = [];
     const visibleGroupIndices: number[] = [];
-    boundingBoxes?.setSelectedRowGroups(pointCloudRenderer?.indices() ?? []);
+    boundingBoxes?.setLoadedRowGroups(pointCloudRenderer?.indices() ?? [], bounds);
     const retainedPointCount = renderedPointCount();
     if (retainedPointCount > 0) {
       setStatus(`${formatInteger(retainedPointCount)} points visible · fetching refinement…`, "loading");
@@ -301,7 +304,7 @@ async function queryAndRender(options: {
       if (replaceRenderedChunk(chunk, bounds)) {
         visibleGroupIndices.push(chunk.rowGroupIndex);
       }
-      boundingBoxes?.setSelectedRowGroups(pointCloudRenderer!.indices());
+      boundingBoxes?.setLoadedRowGroups(pointCloudRenderer!.indices(), bounds);
       setStatus(
         `${formatInteger(renderedPointCount())} points visible · ${loadedGroups}/${selectedGroups.length} Row Groups`,
         "loading",
@@ -318,7 +321,7 @@ async function queryAndRender(options: {
       : await pointCloudReader.readLevel(bounds, resolution, selectedColorMode(), onChunk);
     loadedSelectionKey = options.selectionKey ?? `level:${resolution}:${boundsKey(bounds)}`;
     retainRenderedGroups(new Set(visibleGroupIndices));
-    boundingBoxes?.setSelectedRowGroups(loadedGroupIndices);
+    boundingBoxes?.setLoadedRowGroups(loadedGroupIndices, bounds);
     updateMetrics(result.metrics, result.workerElapsedMs);
     setStatus(`${formatInteger(result.metrics.pointsMatched)} points ready`, "ready");
     element<HTMLDivElement>("empty-state").classList.add("hidden");
@@ -486,6 +489,11 @@ async function applyAutomaticLod(fit = false, wasImmediate = false): Promise<voi
     camera.position.z + origin[2],
   ];
   const bounds = readBoundsInputs();
+  camera.updateMatrixWorld();
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(
+    new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+  );
+  const localBounds = new THREE.Box3();
   const selection = selectRowGroupsBySse(
     cloud.rowGroups,
     cloud.resolutions,
@@ -495,6 +503,19 @@ async function applyAutomaticLod(fit = false, wasImmediate = false): Promise<voi
     camera.fov,
     Number(element<HTMLInputElement>("sse-threshold").value),
     readPointBudget(),
+    (worldBounds) => {
+      localBounds.min.set(
+        worldBounds.min[0] - origin[0],
+        worldBounds.min[1] - origin[1],
+        worldBounds.min[2] - origin[2],
+      );
+      localBounds.max.set(
+        worldBounds.max[0] - origin[0],
+        worldBounds.max[1] - origin[1],
+        worldBounds.max[2] - origin[2],
+      );
+      return frustum.intersectsBox(localBounds);
+    },
   );
   updateSpatialSseHud(selection);
   const selectionKey = `groups:${selection.rowGroupIndices.join(",")}:${boundsKey(bounds)}`;
@@ -540,10 +561,28 @@ function updateSpatialSseHud(selection: SpatialSseSelection): void {
   }
 }
 
-function updateBoundingBoxes(): void {
-  boundingBoxes?.setResolutionVisible(element<HTMLInputElement>("show-level-bounds").checked);
-  boundingBoxes?.setRowGroupsVisible(element<HTMLInputElement>("show-row-group-bounds").checked);
+async function updateBoundingBoxes(): Promise<void> {
+  const layer = boundingBoxes;
+  if (!layer) return;
+  const showPages = element<HTMLInputElement>("show-page-bounds").checked;
+  layer.setPagesVisible(showPages);
+  layer.setRowGroupsVisible(element<HTMLInputElement>("show-row-group-bounds").checked);
   requestRender();
+  if (!showPages || layer.hasPages() || loadingPageBounds === layer) return;
+  loadingPageBounds = layer;
+  try {
+    const pages = await pointCloudReader.pageBounds();
+    if (boundingBoxes !== layer) return;
+    layer.setPages(pages);
+    requestRender();
+  } catch (error) {
+    element<HTMLInputElement>("show-page-bounds").checked = false;
+    layer.setPagesVisible(false);
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(`Page bbox unavailable: ${message}`, "error");
+  } finally {
+    if (loadingPageBounds === layer) loadingPageBounds = null;
+  }
 }
 
 function updateMetrics(metrics: QueryMetrics, workerElapsedMs: number): void {

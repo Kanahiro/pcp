@@ -1,11 +1,15 @@
 import {
   asyncBufferFromUrl,
   parquetMetadataAsync,
+  parquetSchema,
   parquetReadObjects,
+  readColumnIndex,
+  readOffsetIndex,
   type AsyncBuffer,
   type FileMetaData,
   type ParquetQueryFilter,
   type RowGroup,
+  type SchemaElement,
 } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import { RangeCache, type RangeCoalescingOptions } from "./range-cache.js";
@@ -35,6 +39,15 @@ export interface SpatialRowGroup {
   rowStart: number;
   rowEnd: number;
   geometricError: number;
+  quantizedBounds: QuantizedBounds;
+  worldBounds: WorldBounds;
+}
+
+export interface SpatialPage {
+  rowGroupIndex: number;
+  pageIndex: number;
+  resolution: number;
+  pointCount: number;
   quantizedBounds: QuantizedBounds;
   worldBounds: WorldBounds;
 }
@@ -101,6 +114,7 @@ export class PointCloudParquet {
   readonly metadataBytesFetched: number;
   readonly rowGroups: SpatialRowGroup[];
   readonly resolutions: ResolutionInfo[];
+  private pageBoundsPromise: Promise<SpatialPage[]> | undefined;
 
   private constructor(
     private readonly file: RangeCache,
@@ -195,6 +209,12 @@ export class PointCloudParquet {
     return this.readRowGroups(quantized, indices, onChunk);
   }
 
+  /** Loads coordinate Page Indexes lazily and exposes no Parquet index details. */
+  pageBounds(): Promise<SpatialPage[]> {
+    this.pageBoundsPromise ??= this.readPageBounds();
+    return this.pageBoundsPromise;
+  }
+
   private async readRowGroups(
     bounds: QuantizedBounds,
     rowGroupIndices: number[],
@@ -250,6 +270,40 @@ export class PointCloudParquet {
     };
   }
 
+  private async readPageBounds(): Promise<SpatialPage[]> {
+    const file = this.file.session();
+    const schema = parquetSchema(this.parquetMetadata);
+    const coordinateSchemas = ["x", "y", "z"].map((name) =>
+      findSchemaElement(schema, name));
+    const groups = await Promise.all(this.parquetMetadata.row_groups.map(
+      async (rowGroup, rowGroupIndex) => {
+        const coordinatePages = await Promise.all(coordinateSchemas.map((element) =>
+          readIndexedColumnPages(file, rowGroup, element)));
+        const starts = coordinatePages[0]!.starts;
+        if (coordinatePages.some((pages) => !sameNumbers(pages.starts, starts))) {
+          throw new Error(`XYZ page boundaries differ in Row Group ${rowGroupIndex}`);
+        }
+        const group = this.rowGroups[rowGroupIndex]!;
+        return starts.map((start, pageIndex): SpatialPage => {
+          const end = starts[pageIndex + 1] ?? group.pointCount;
+          const quantizedBounds: QuantizedBounds = {
+            min: coordinatePages.map((pages) => pages.minimums[pageIndex]!) as [number, number, number],
+            max: coordinatePages.map((pages) => pages.maximums[pageIndex]!) as [number, number, number],
+          };
+          return {
+            rowGroupIndex,
+            pageIndex,
+            resolution: group.resolution,
+            pointCount: end - start,
+            quantizedBounds,
+            worldBounds: decodeBounds(quantizedBounds, this.metadata),
+          };
+        });
+      },
+    ));
+    return groups.flat();
+  }
+
   private emptyResult(): QueryResult {
     return {
       points: [],
@@ -265,6 +319,61 @@ export class PointCloudParquet {
       },
     };
   }
+}
+
+interface IndexedColumnPages {
+  starts: number[];
+  minimums: number[];
+  maximums: number[];
+}
+
+async function readIndexedColumnPages(
+  file: AsyncBuffer,
+  rowGroup: RowGroup,
+  schema: SchemaElement,
+): Promise<IndexedColumnPages> {
+  const column = rowGroup.columns.find((candidate) =>
+    candidate.meta_data?.path_in_schema.join(".") === schema.name);
+  if (!column?.column_index_offset || !column.column_index_length
+    || !column.offset_index_offset || !column.offset_index_length) {
+    throw new Error(`Parquet column ${schema.name} is missing its Page Index`);
+  }
+  const columnStart = Number(column.column_index_offset);
+  const offsetStart = Number(column.offset_index_offset);
+  const [columnBuffer, offsetBuffer] = await Promise.all([
+    file.slice(columnStart, columnStart + column.column_index_length),
+    file.slice(offsetStart, offsetStart + column.offset_index_length),
+  ]);
+  const columnIndex = readColumnIndex({ view: new DataView(columnBuffer), offset: 0 }, schema);
+  const offsetIndex = readOffsetIndex({ view: new DataView(offsetBuffer), offset: 0 });
+  const starts = offsetIndex.page_locations.map((location) => Number(location.first_row_index));
+  if (columnIndex.null_pages.some(Boolean)
+    || columnIndex.min_values.length !== starts.length
+    || columnIndex.max_values.length !== starts.length) {
+    throw new Error(`Parquet column ${schema.name} has an invalid Page Index`);
+  }
+  return {
+    starts,
+    minimums: columnIndex.min_values.map((value) => requiredNumber(value, schema.name)),
+    maximums: columnIndex.max_values.map((value) => requiredNumber(value, schema.name)),
+  };
+}
+
+function findSchemaElement(schema: ReturnType<typeof parquetSchema>, name: string): SchemaElement {
+  const node = schema.children.find((child) => child.path.join(".") === name);
+  if (!node) throw new Error(`Parquet schema is missing column ${name}`);
+  return node.element;
+}
+
+function requiredNumber(value: unknown, column: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypeError(`Parquet column ${column} has non-numeric Page Index statistics`);
+  }
+  return value;
+}
+
+function sameNumbers(left: number[], right: number[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 class MeteredBuffer implements AsyncBuffer {

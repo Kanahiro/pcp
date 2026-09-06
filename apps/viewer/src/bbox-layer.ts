@@ -1,4 +1,4 @@
-import type { WorldBounds } from "@pointcloud-parquet/browser";
+import type { SpatialPage, WorldBounds } from "@pointcloud-parquet/browser";
 import * as THREE from "three";
 import { resolutionColor } from "./point-buffer";
 import type { CloudDescription } from "./worker-protocol";
@@ -7,44 +7,66 @@ type BoundsItem = { worldBounds: WorldBounds; resolution: number };
 
 export class BoundingBoxLayers {
   readonly group = new THREE.Group();
-  private readonly resolutionGroup = new THREE.Group();
+  private readonly pageGroup = new THREE.Group();
   private readonly rowGroupGroup = new THREE.Group();
   private readonly rowGroups: BoundsItem[];
   private readonly origin: readonly [number, number, number];
-  private selectedLines: THREE.LineSegments;
+  private loadedRowGroupLines: THREE.LineSegments;
+  private pageLines: THREE.LineSegments;
+  private loadedPageLines: THREE.LineSegments;
+  private pages: SpatialPage[] = [];
+  private loadedRowGroupIndices = new Set<number>();
+  private loadedQueryBounds: WorldBounds | null = null;
+  private pagesLoaded = false;
 
   constructor(cloud: CloudDescription, origin: readonly [number, number, number]) {
     this.rowGroups = cloud.rowGroups;
     this.origin = origin;
-    const resolutions = cloud.resolutions
-      .filter((level) => level.worldBounds !== null)
-      .map((level) => ({ worldBounds: level.worldBounds!, resolution: level.resolution }));
-    this.resolutionGroup.add(boxLines(resolutions, origin, 0.72));
-    this.rowGroupGroup.add(boxLines(this.rowGroups, origin, 0.14));
-    this.selectedLines = boxLines([], origin, 0.95);
-    this.rowGroupGroup.add(this.selectedLines);
-    this.group.add(this.resolutionGroup, this.rowGroupGroup);
-    this.resolutionGroup.visible = false;
+    this.pageLines = boxLines([], origin, 0.06);
+    this.loadedPageLines = boxLines([], origin, 0.82);
+    this.pageGroup.add(this.pageLines, this.loadedPageLines);
+    this.rowGroupGroup.add(boxLines(this.rowGroups, origin, 0.1));
+    this.loadedRowGroupLines = boxLines([], origin, 0.95);
+    this.rowGroupGroup.add(this.loadedRowGroupLines);
+    this.group.add(this.pageGroup, this.rowGroupGroup);
+    this.pageGroup.visible = false;
     this.rowGroupGroup.visible = true;
   }
 
-  setResolutionVisible(visible: boolean): void {
-    this.resolutionGroup.visible = visible;
+  setPagesVisible(visible: boolean): void {
+    this.pageGroup.visible = visible;
+  }
+
+  hasPages(): boolean {
+    return this.pagesLoaded;
+  }
+
+  setPages(pages: SpatialPage[]): void {
+    this.pages = pages;
+    this.pageGroup.remove(this.pageLines);
+    disposeLines(this.pageLines);
+    this.pageLines = boxLines(pages, this.origin, 0.06);
+    this.pageGroup.add(this.pageLines);
+    this.pagesLoaded = true;
+    this.rebuildLoadedPages();
   }
 
   setRowGroupsVisible(visible: boolean): void {
     this.rowGroupGroup.visible = visible;
   }
 
-  setSelectedRowGroups(indices: number[]): void {
-    this.rowGroupGroup.remove(this.selectedLines);
-    disposeLines(this.selectedLines);
-    this.selectedLines = boxLines(
+  setLoadedRowGroups(indices: number[], queryBounds: WorldBounds): void {
+    this.loadedRowGroupIndices = new Set(indices);
+    this.loadedQueryBounds = queryBounds;
+    this.rowGroupGroup.remove(this.loadedRowGroupLines);
+    disposeLines(this.loadedRowGroupLines);
+    this.loadedRowGroupLines = boxLines(
       indices.map((index) => this.rowGroups[index]!).filter(Boolean),
       this.origin,
       0.95,
     );
-    this.rowGroupGroup.add(this.selectedLines);
+    this.rowGroupGroup.add(this.loadedRowGroupLines);
+    this.rebuildLoadedPages();
   }
 
   dispose(): void {
@@ -53,6 +75,21 @@ export class BoundingBoxLayers {
     });
     this.group.removeFromParent();
   }
+
+  private rebuildLoadedPages(): void {
+    this.pageGroup.remove(this.loadedPageLines);
+    disposeLines(this.loadedPageLines);
+    const loadedPages = this.loadedQueryBounds === null ? [] : this.pages.filter((page) =>
+      this.loadedRowGroupIndices.has(page.rowGroupIndex)
+      && boundsOverlap(page.worldBounds, this.loadedQueryBounds!));
+    this.loadedPageLines = boxLines(loadedPages, this.origin, 0.82);
+    this.pageGroup.add(this.loadedPageLines);
+  }
+}
+
+function boundsOverlap(left: WorldBounds, right: WorldBounds): boolean {
+  return left.min.every((minimum, axis) =>
+    minimum <= right.max[axis]! && left.max[axis]! >= right.min[axis]!);
 }
 
 function boxLines(
@@ -97,4 +134,3 @@ function disposeLines(lines: THREE.LineSegments): void {
   lines.geometry.dispose();
   (lines.material as THREE.Material).dispose();
 }
-

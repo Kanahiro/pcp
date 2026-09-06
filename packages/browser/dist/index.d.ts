@@ -25,6 +25,14 @@ export interface SpatialRowGroup {
     quantizedBounds: QuantizedBounds;
     worldBounds: WorldBounds;
 }
+export interface SpatialPage {
+    rowGroupIndex: number;
+    pageIndex: number;
+    resolution: number;
+    pointCount: number;
+    quantizedBounds: QuantizedBounds;
+    worldBounds: WorldBounds;
+}
 export interface ResolutionInfo {
     resolution: number;
     rowGroupStart: number;
@@ -79,6 +87,7 @@ export declare class PointCloudParquet {
     readonly metadataBytesFetched: number;
     readonly rowGroups: SpatialRowGroup[];
     readonly resolutions: ResolutionInfo[];
+    private pageBoundsPromise;
     private constructor();
     static open(url: string, options?: OpenOptions): Promise<PointCloudParquet>;
     worldToQuantized(bounds: WorldBounds): QuantizedBounds;
@@ -86,7 +95,10 @@ export declare class PointCloudParquet {
     queryWorld(bounds: WorldBounds, maxResolution: number, onChunk?: (chunk: QueryChunk) => void): Promise<QueryResult>;
     queryQuantized(bounds: QuantizedBounds, maxResolution: number, onChunk?: (chunk: QueryChunk) => void): Promise<QueryResult>;
     queryRowGroupsWorld(bounds: WorldBounds, rowGroupIndices: number[], onChunk?: (chunk: QueryChunk) => void): Promise<QueryResult>;
+    /** Loads coordinate Page Indexes lazily and exposes no Parquet index details. */
+    pageBounds(): Promise<SpatialPage[]>;
     private readRowGroups;
+    private readPageBounds;
     private emptyResult;
 }
 export declare function planQuery(rowGroups: RowGroup[], bounds: QuantizedBounds, levelRowGroupEnds: number[], maxResolution: number): {

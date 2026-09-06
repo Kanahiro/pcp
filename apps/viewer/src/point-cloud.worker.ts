@@ -41,6 +41,11 @@ async function handle(request: WorkerRequest): Promise<void> {
   }
   if (!cloud) throw new Error("open a point cloud before querying it");
 
+  if (request.kind === "page-bounds") {
+    respond({ id: request.id, ok: true, kind: "result", payload: await cloud.pageBounds() });
+    return;
+  }
+
   if (request.kind === "query-level" || request.kind === "query-row-groups") {
     const started = performance.now();
     const renderedChunks = new Map<number, QuantizedPoint[]>();

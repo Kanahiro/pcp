@@ -49,6 +49,27 @@ describe("selectRowGroupsBySse", () => {
     expect(selection.rowGroupIndices).toEqual([0, 1]);
   });
 
+  it("excludes Row Groups outside the camera frustum before applying SSE", () => {
+    const shifted: WorldBounds = { min: [1000, 0, 0], max: [1010, 10, 10] };
+    const groups = [
+      rowGroups[0]!,
+      rowGroups[1]!,
+      { ...rowGroups[1]!, index: 2, worldBounds: shifted },
+    ];
+    const selection = selectRowGroupsBySse(
+      groups,
+      resolutions,
+      { min: [0, 0, 0], max: [2000, 10, 10] },
+      [5, 5, 20],
+      1000,
+      90,
+      5,
+      100,
+      (groupBounds) => groupBounds !== shifted,
+    );
+    expect(selection.rowGroupIndices).toEqual([0, 1]);
+  });
+
   it("keeps the highest-error refinements within the point budget", () => {
     const closerBounds: WorldBounds = { min: [0, 0, 20], max: [10, 10, 30] };
     const groups = [

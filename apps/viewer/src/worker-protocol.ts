@@ -2,6 +2,7 @@ import type {
   PointCloudMetadata,
   QueryMetrics,
   ResolutionInfo,
+  SpatialPage,
   SpatialRowGroup,
   WorldBounds,
 } from "@pointcloud-parquet/browser";
@@ -31,6 +32,7 @@ export interface RecoloredPoints {
 
 export type WorkerCommand =
   | { kind: "open"; url: string }
+  | { kind: "page-bounds" }
   | {
       kind: "query-level";
       bounds: WorldBounds;
@@ -48,6 +50,6 @@ export type WorkerCommand =
 export type WorkerRequest = WorkerCommand & { id: number };
 
 export type WorkerResponse =
-  | { id: number; ok: true; kind: "result"; payload: CloudDescription | RenderedQuery | RecoloredPoints }
+  | { id: number; ok: true; kind: "result"; payload: CloudDescription | SpatialPage[] | RenderedQuery | RecoloredPoints }
   | { id: number; ok: true; kind: "query-chunk"; payload: RenderedChunk }
   | { id: number; ok: false; error: string };

@@ -22,6 +22,7 @@ export function selectRowGroupsBySse(
   verticalFovDegrees: number,
   pixelThreshold: number,
   pointBudget: number,
+  intersectsView: (bounds: WorldBounds) => boolean = () => true,
 ): SpatialSseSelection {
   if (resolutions.length === 0) throw new RangeError("at least one resolution is required");
   if (!(viewportHeight > 0 && verticalFovDegrees > 0 && pixelThreshold >= 0 && pointBudget > 0)) {
@@ -37,7 +38,9 @@ export function selectRowGroupsBySse(
   let nearestActivationPixels = 0;
 
   for (const group of rowGroups) {
-    if (!boundsOverlap(group.worldBounds, queryBounds)) continue;
+    if (!boundsOverlap(group.worldBounds, queryBounds) || !intersectsView(group.worldBounds)) {
+      continue;
+    }
     const containsCamera = boundsContainPoint(group.worldBounds, cameraPosition);
     let activationPixels = Number.POSITIVE_INFINITY;
     if (group.resolution !== 0) {
