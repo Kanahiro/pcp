@@ -63,8 +63,8 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
           <label class="switch-row" for="auto-lod"><span><b>Automatic LOD</b><small>Per-Row Group geometric error</small></span><input id="auto-lod" type="checkbox" checked><i></i></label>
           <label for="sse-threshold">SSE threshold</label>
           <div class="range-row">
-            <input id="sse-threshold" type="range" min="0" max="32" value="16" step="0.5" />
-            <output id="sse-threshold-value">16 px</output>
+            <input id="sse-threshold" type="range" min="0" max="32" value="8" step="0.5" />
+            <output id="sse-threshold-value">8 px</output>
           </div>
           <div class="lod-distribution" id="lod-distribution">Awaiting Row Group selection</div>
           <label for="point-budget">Point budget</label>
