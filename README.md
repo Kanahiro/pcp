@@ -60,7 +60,7 @@ XYZとintensityには `DELTA_BINARY_PACKED`、GPS timeには `BYTE_STREAM_SPLIT`
 
 `--page-order` はnested STRが決めた各data pageの点集合を変えず、page内部だけを `spatial`（既定）、`hilbert`、`source`、`gps-time` のいずれかで並べ替えます。`--intensity-encoding` は `delta`（既定）、`dictionary`、`plain` を比較できます。これらは実験用のknobであり、ブラウザのbbox queryを主用途とする既定値は `spatial` と `delta` です。
 
-voxelはLASの量子化整数格子上で構築します。levelを1段粗くしたときの各軸の辺長比は `--voxel-edge-ratio`（既定2）で指定し、2以上の整数に限定します。総level数をN、level番号をrとすると、各軸の物理辺長は `scale[axis] * ratio^(N - 1 - r)` です。`--levels` を省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小のratio冪を選びます。最終levelは残点をすべて格納してexactにし、全点は重複も欠落もなくちょうど1 levelへ所属します。
+voxelは物理空間の立方体として構築します。最細の一辺は3軸の `max(scale)` から導出し、levelを1段粗くしたときの辺長比は `--voxel-edge-ratio`（既定2）で指定します。総level数をN、level番号をrとすると、一辺は `max(scale) * ratio^(N - 1 - r)`、対角長はその `√3` 倍です。`--levels` を省略すると、L0の占有voxel数が `--coarse-points`（既定8192）以下になる最小のratio冪を選びます。最終levelは残点をすべて格納してexactにし、全点は重複も欠落もなくちょうど1 levelへ所属します。
 
 Row Groupは指定点数を上限とし、level境界で必ず終了します。そのため各levelの末尾だけは小さくなります。CLIはlevel別点数、出力サイズ、bytes/point、変換時間をJSONで表示します。
 
@@ -69,6 +69,8 @@ Row Groupは指定点数を上限とし、level境界で必ず終了します。
 既定値は64K点です。ブラウザreaderはquery bboxに完全包含されるRow Groupでは、物理的に連続するXYZRGBを1本のHTTP Rangeへまとめます。bbox境界と交差するRow Groupだけはpage単位で取得します。
 
 各Row Group内はnested STRによる既定4K行のdata pageに分かれ、Page Index/Offset Indexを使ってbbox外のpageを取得前に除外します。
+
+同時に発生した近接Rangeはreader内部でまとめます。既定ではgapが32 KiB以下、結合後が2 MiB以下なら一つのrequestにし、細かなPage Index pruningを保ちながらHTTP request数を抑えます。`PointCloudParquet.open` の `rangeCoalescing` で両上限を変更できます。
 
 ## DuckDBでpruningを確認
 
@@ -92,6 +94,19 @@ WHERE x BETWEEN 1000 AND 2000
 ```
 
 LOD範囲は汎用SQL column filterではなく、`point_cloud.level_row_group_ends` が示す物理Row Group範囲で選択します。`scripts/benchmark-duckdb.mjs` はmetadataからL0〜指定levelの行prefixとRow Group終端を読み取って計測します。
+
+## COPCとの比較ベンチマーク
+
+同じ元点群から作ったParquetとCOPCを指定すると、同一の5種類の3D bboxでXYZRGBのRange転送量、request数、候補点数、一致点数、decodeを含む時間を比較します。byte rangeはローカルファイルから直接読み、各sampleはcold application cacheで実行し、実行順は交互にします。既定では全点数の25%に最も近い累積点数となるLODを形式ごとに選びます。LOD構造とsamplingは同一ではないため、結果にはParquetの幾何誤差、COPCの公称spacing、実際の一致点数も併記します。
+
+```sh
+pnpm benchmark:copc -- 114112.parquet 114112.copc.laz \
+  --repeats 3 --warmup 1 --output /tmp/copc-comparison.json
+```
+
+`--level` または `--copc-depth` の一方だけを指定した場合、もう一方は累積点数が最も近いLODを選びます。両方を指定すれば完全に固定できます。これはネットワーク遅延を除いたlocal reader比較であり、CDNのRTTやHTTP/2多重化を含む配信性能そのものではありません。
+
+`--range-gap` と `--range-size` でParquet readerのcoalescing値を上書きでき、転送量とrequest数のtrade-offを比較できます。実測結果と判断は [COPC比較レポート](benchmarks/copc-comparison.md) にまとめています。
 
 ## ブラウザでレンダリング
 

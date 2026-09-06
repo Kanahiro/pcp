@@ -8,7 +8,9 @@ import {
   type RowGroup,
 } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
-import { RangeCache } from "./range-cache.js";
+import { RangeCache, type RangeCoalescingOptions } from "./range-cache.js";
+
+export type { RangeCoalescingOptions } from "./range-cache.js";
 
 export interface PointCloudMetadata {
   version: string;
@@ -16,6 +18,7 @@ export interface PointCloudMetadata {
   offset: [number, number, number];
   bounds: [number, number, number, number, number, number];
   level_row_group_ends: number[];
+  /** Adjacent-level cube edge ratio; the finest cube edge is max(scale). */
   voxel_edge_ratio: number;
   crs: Record<string, unknown> | null;
 }
@@ -87,6 +90,7 @@ export interface OpenOptions {
   byteLength?: number;
   fetch?: typeof globalThis.fetch;
   requestInit?: RequestInit;
+  rangeCoalescing?: RangeCoalescingOptions;
 }
 
 const RENDER_COLUMNS = ["x", "y", "z", "red", "green", "blue"] as const;
@@ -122,7 +126,12 @@ export class PointCloudParquet {
     const parquetMetadata = await parquetMetadataAsync(metered);
     const metadata = parsePointCloudMetadata(parquetMetadata);
     validateLevelLayout(metadata.level_row_group_ends, parquetMetadata);
-    return new PointCloudParquet(new RangeCache(file), metadata, parquetMetadata, metered.bytesFetched);
+    return new PointCloudParquet(
+      new RangeCache(file, 64 * 1024 * 1024, options.rangeCoalescing),
+      metadata,
+      parquetMetadata,
+      metered.bytesFetched,
+    );
   }
 
   worldToQuantized(bounds: WorldBounds): QuantizedBounds {
@@ -511,7 +520,7 @@ function buildResolutionInfo(
 
 function voxelDiagonalAt(metadata: PointCloudMetadata, resolution: number): number {
   const exponent = metadata.level_row_group_ends.length - 1 - resolution;
-  return Math.hypot(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
+  return Math.sqrt(3) * Math.max(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
 }
 
 function rowGroupBounds(rowGroup: RowGroup): QuantizedBounds {

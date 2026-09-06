@@ -125,6 +125,7 @@ fn main() -> Result<()> {
         automatic_level_count_for_target(
             &points,
             integer_bounds,
+            scales,
             args.voxel_edge_ratio,
             args.coarse_points,
         )
@@ -133,6 +134,7 @@ fn main() -> Result<()> {
     let mut levels = build_levels(
         points,
         requested_levels,
+        scales,
         args.voxel_edge_ratio,
         integer_bounds,
     );

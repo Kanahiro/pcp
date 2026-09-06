@@ -28,7 +28,7 @@ export class PointCloudParquet {
         const parquetMetadata = await parquetMetadataAsync(metered);
         const metadata = parsePointCloudMetadata(parquetMetadata);
         validateLevelLayout(metadata.level_row_group_ends, parquetMetadata);
-        return new PointCloudParquet(new RangeCache(file), metadata, parquetMetadata, metered.bytesFetched);
+        return new PointCloudParquet(new RangeCache(file, 64 * 1024 * 1024, options.rangeCoalescing), metadata, parquetMetadata, metered.bytesFetched);
     }
     worldToQuantized(bounds) {
         const { scale, offset } = this.metadata;
@@ -345,7 +345,7 @@ function buildResolutionInfo(rowGroups, metadata) {
 }
 function voxelDiagonalAt(metadata, resolution) {
     const exponent = metadata.level_row_group_ends.length - 1 - resolution;
-    return Math.hypot(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
+    return Math.sqrt(3) * Math.max(...metadata.scale) * metadata.voxel_edge_ratio ** exponent;
 }
 function rowGroupBounds(rowGroup) {
     const ranges = columnRanges(rowGroup);

@@ -8,21 +8,23 @@ pub struct Level {
     pub points: Vec<Point>,
 }
 
-/// Number of levels in the complete quantized-grid ladder. The last level is
-/// exact; preceding levels use `ratio^exponent` raw coordinate units per axis.
-pub fn automatic_level_count(bounds: IntegerBounds, ratio: u32) -> u8 {
+/// Number of levels in the complete physical-space voxel ladder. The finest
+/// cube edge is the coarsest axis scale; the last level is exact.
+pub fn automatic_level_count(bounds: IntegerBounds, scales: [f64; 3], ratio: u32) -> u8 {
     assert!(ratio >= 2);
+    let normalized_scales = normalized_scales(scales);
     let largest_span = [
         i64::from(bounds.max.x) - i64::from(bounds.min.x),
         i64::from(bounds.max.y) - i64::from(bounds.min.y),
         i64::from(bounds.max.z) - i64::from(bounds.min.z),
     ]
     .into_iter()
-    .max()
-    .unwrap_or(0) as u64;
+    .zip(normalized_scales)
+    .map(|(span, scale)| span as f64 * scale)
+    .fold(0.0_f64, f64::max);
     let mut exponent = 0_u8;
     let mut width = 1_u64;
-    while width <= largest_span {
+    while width as f64 <= largest_span {
         width = width.saturating_mul(u64::from(ratio));
         exponent = exponent.saturating_add(1);
     }
@@ -34,17 +36,26 @@ pub fn automatic_level_count(bounds: IntegerBounds, ratio: u32) -> u8 {
 pub fn automatic_level_count_for_target(
     points: &[Point],
     bounds: IntegerBounds,
+    scales: [f64; 3],
     ratio: u32,
     target_points: usize,
 ) -> u8 {
     assert!(target_points > 0);
-    let maximum_levels = automatic_level_count(bounds, ratio);
+    let normalized_scales = normalized_scales(scales);
+    let maximum_levels = automatic_level_count(bounds, scales, ratio);
     let mut lower_exponent = 0_u32;
     let mut upper_exponent = u32::from(maximum_levels - 1);
     while lower_exponent < upper_exponent {
         let exponent = (lower_exponent + upper_exponent) / 2;
         let voxel_width = voxel_width(ratio, exponent);
-        if occupied_voxel_count(points, bounds.min, voxel_width, target_points) <= target_points {
+        if occupied_voxel_count(
+            points,
+            bounds.min,
+            normalized_scales,
+            voxel_width,
+            target_points,
+        ) <= target_points
+        {
             upper_exponent = exponent;
         } else {
             lower_exponent = exponent + 1;
@@ -63,11 +74,13 @@ struct Voxel(i64, i64, i64);
 pub fn build_levels(
     points: Vec<Point>,
     levels: u8,
+    scales: [f64; 3],
     ratio: u32,
     bounds: IntegerBounds,
 ) -> Vec<Level> {
     assert!(levels > 0);
     assert!(ratio >= 2);
+    let normalized_scales = normalized_scales(scales);
 
     let mut remaining: Vec<Option<Point>> = points.into_iter().map(Some).collect();
     let mut output = Vec::with_capacity(levels as usize);
@@ -83,7 +96,7 @@ pub fn build_levels(
             let mut representatives = HashMap::new();
             for (index, slot) in remaining.iter().enumerate() {
                 let Some(point) = *slot else { continue };
-                let voxel = voxel_for(point, bounds.min, voxel_width);
+                let voxel = voxel_for(point, bounds.min, normalized_scales, voxel_width);
                 let candidate = (
                     representative_priority(point, exponent),
                     point.source_index,
@@ -143,24 +156,34 @@ fn voxel_width(ratio: u32, exponent: u32) -> u64 {
         .min(i64::MAX as u64)
 }
 
-fn voxel_for(point: Point, origin: Point, width: u64) -> Voxel {
-    let width = width as i64;
+fn normalized_scales(scales: [f64; 3]) -> [f64; 3] {
+    assert!(scales.iter().all(|scale| scale.is_finite() && *scale > 0.0));
+    let finest_cube_edge = scales.into_iter().fold(f64::NEG_INFINITY, f64::max);
+    scales.map(|scale| scale / finest_cube_edge)
+}
+
+fn voxel_for(point: Point, origin: Point, scales: [f64; 3], width: u64) -> Voxel {
+    let index = |coordinate: i32, origin: i32, axis: usize| {
+        (((i64::from(coordinate) - i64::from(origin)) as f64 * scales[axis]) / width as f64).floor()
+            as i64
+    };
     Voxel(
-        (i64::from(point.x) - i64::from(origin.x)) / width,
-        (i64::from(point.y) - i64::from(origin.y)) / width,
-        (i64::from(point.z) - i64::from(origin.z)) / width,
+        index(point.x, origin.x, 0),
+        index(point.y, origin.y, 1),
+        index(point.z, origin.z, 2),
     )
 }
 
 fn occupied_voxel_count(
     points: &[Point],
     origin: Point,
+    scales: [f64; 3],
     voxel_width: u64,
     stop_after: usize,
 ) -> usize {
     let mut occupied = HashSet::with_capacity(stop_after.saturating_add(1));
     for &point in points {
-        occupied.insert(voxel_for(point, origin, voxel_width));
+        occupied.insert(voxel_for(point, origin, scales, voxel_width));
         if occupied.len() > stop_after {
             break;
         }
@@ -183,7 +206,7 @@ mod tests {
             })
             .collect();
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points.clone(), 5, 2, bounds);
+        let levels = build_levels(points.clone(), 5, [1.0; 3], 2, bounds);
         assert_eq!(
             points.len(),
             levels.iter().map(|l| l.points.len()).sum::<usize>()
@@ -215,7 +238,7 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points, 2, 4, bounds);
+        let levels = build_levels(points, 2, [1.0; 3], 4, bounds);
         assert_eq!(2, levels[0].points.len());
         assert_eq!(1, levels[1].points.len());
     }
@@ -237,7 +260,7 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        assert_eq!(20, automatic_level_count(bounds, 2));
+        assert_eq!(20, automatic_level_count(bounds, [1.0; 3], 2));
     }
 
     #[test]
@@ -251,9 +274,9 @@ mod tests {
             })
             .collect();
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = automatic_level_count_for_target(&points, bounds, 2, 8);
+        let levels = automatic_level_count_for_target(&points, bounds, [1.0; 3], 2, 8);
         assert_eq!(5, levels);
-        let hierarchy = build_levels(points, levels, 2, bounds);
+        let hierarchy = build_levels(points, levels, [1.0; 3], 2, bounds);
         assert_eq!(7, hierarchy[0].points.len());
     }
 
@@ -274,7 +297,7 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points, 10, 2, bounds);
+        let levels = build_levels(points, 10, [1.0; 3], 2, bounds);
         assert_eq!(10, levels.len());
         assert_eq!(
             2,
@@ -306,7 +329,7 @@ mod tests {
             },
         ];
         let bounds = IntegerBounds::from_points(&points).unwrap();
-        let levels = build_levels(points, 2, 2, bounds);
+        let levels = build_levels(points, 2, [1.0; 3], 2, bounds);
 
         assert_eq!(2, levels.len());
         assert_eq!(1, levels[0].points.len());
@@ -327,8 +350,8 @@ mod tests {
         let mut reversed = points.clone();
         reversed.reverse();
 
-        let forward = build_levels(points, 2, 64, bounds);
-        let backward = build_levels(reversed, 2, 64, bounds);
+        let forward = build_levels(points, 2, [1.0; 3], 64, bounds);
+        let backward = build_levels(reversed, 2, [1.0; 3], 64, bounds);
         let forward_ids: HashSet<_> = forward[0]
             .points
             .iter()
@@ -342,5 +365,30 @@ mod tests {
 
         assert_eq!(forward_ids, backward_ids);
         assert_ne!(HashSet::from([0]), forward_ids);
+    }
+
+    #[test]
+    fn anisotropic_scales_still_form_physical_cubes() {
+        let points = vec![
+            Point {
+                x: 0,
+                y: 0,
+                z: 0,
+                source_index: 0,
+            },
+            Point {
+                x: 0,
+                y: 0,
+                z: 99,
+                source_index: 1,
+            },
+        ];
+        let bounds = IntegerBounds::from_points(&points).unwrap();
+        let levels = build_levels(points, 2, [1.0, 1.0, 0.01], 2, bounds);
+
+        // The coarse physical cube is two units on every axis, which is 200
+        // quantized Z units rather than two.
+        assert_eq!(1, levels[0].points.len());
+        assert_eq!(1, levels[1].points.len());
     }
 }

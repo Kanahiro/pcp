@@ -1,10 +1,13 @@
 import { type FileMetaData, type RowGroup } from "hyparquet";
+import { type RangeCoalescingOptions } from "./range-cache.js";
+export type { RangeCoalescingOptions } from "./range-cache.js";
 export interface PointCloudMetadata {
     version: string;
     scale: [number, number, number];
     offset: [number, number, number];
     bounds: [number, number, number, number, number, number];
     level_row_group_ends: number[];
+    /** Adjacent-level cube edge ratio; the finest cube edge is max(scale). */
     voxel_edge_ratio: number;
     crs: Record<string, unknown> | null;
 }
@@ -67,6 +70,7 @@ export interface OpenOptions {
     byteLength?: number;
     fetch?: typeof globalThis.fetch;
     requestInit?: RequestInit;
+    rangeCoalescing?: RangeCoalescingOptions;
 }
 export declare class PointCloudParquet {
     private readonly file;

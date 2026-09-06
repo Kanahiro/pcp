@@ -9,6 +9,7 @@ pub struct PointCloudMetadata {
     /// Exclusive Row Group end for each resolution level. Starts are the
     /// previous entries (or zero), so storing them would be redundant.
     pub level_row_group_ends: Vec<u32>,
+    /// Adjacent-level cube edge ratio. The finest cube edge is max(scale).
     pub voxel_edge_ratio: u32,
     /// PROJJSON object, or null when the source does not declare a CRS.
     pub crs: serde_json::Value,
