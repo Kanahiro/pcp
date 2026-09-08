@@ -1,6 +1,8 @@
 import { type FileMetaData, type RowGroup } from "hyparquet";
+import { type QuantizedPointColumns } from "./point-columns.js";
 import { type RangeCoalescingOptions } from "./range-cache.js";
 export type { RangeCoalescingOptions } from "./range-cache.js";
+export type { QuantizedPointColumns } from "./point-columns.js";
 export interface PointCloudMetadata {
     version: string;
     scale: [number, number, number];
@@ -67,12 +69,12 @@ export interface QueryMetrics {
     elapsedMs: number;
 }
 export interface QueryResult {
-    points: QuantizedPoint[];
+    chunks: QuantizedPointColumns[];
     metrics: QueryMetrics;
 }
 export interface QueryChunk {
     rowGroupIndex: number;
-    points: QuantizedPoint[];
+    points: QuantizedPointColumns;
 }
 export interface OpenOptions {
     byteLength?: number;
@@ -82,6 +84,7 @@ export interface OpenOptions {
 }
 export declare class PointCloudParquet {
     private readonly file;
+    private readonly compressors;
     readonly metadata: PointCloudMetadata;
     readonly parquetMetadata: FileMetaData;
     readonly metadataBytesFetched: number;

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { PointCloudParquet, type QuantizedPoint } from "@pointcloud-parquet/browser";
+import { PointCloudParquet, type QuantizedPointColumns } from "@pointcloud-parquet/browser";
 import { buildPointBuffers } from "./point-buffer";
 import type {
   CloudDescription,
@@ -11,7 +11,7 @@ import type {
 } from "./worker-protocol";
 
 let cloud: PointCloudParquet | null = null;
-let lastPointChunks = new Map<number, QuantizedPoint[]>();
+let lastPointChunks = new Map<number, QuantizedPointColumns>();
 let queue = Promise.resolve();
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
@@ -48,8 +48,8 @@ async function handle(request: WorkerRequest): Promise<void> {
 
   if (request.kind === "query-level" || request.kind === "query-row-groups") {
     const started = performance.now();
-    const renderedChunks = new Map<number, QuantizedPoint[]>();
-    const emitChunk = ({ rowGroupIndex, points }: { rowGroupIndex: number; points: QuantizedPoint[] }) => {
+    const renderedChunks = new Map<number, QuantizedPointColumns>();
+    const emitChunk = ({ rowGroupIndex, points }: { rowGroupIndex: number; points: QuantizedPointColumns }) => {
       if (points.length > 0) renderedChunks.set(rowGroupIndex, points);
       const buffers = buildPointBuffers(points, cloud!.metadata, request.colorMode);
       respond(

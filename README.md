@@ -128,7 +128,7 @@ LODはデフォルトでRow Group単位に自動選択します。camera frustum
 
 現時点の幾何誤差は元のgrid samplingから得られる保守的な上限で、点群から測定したHausdorff誤差ではありません。またRow Group間に親子関係を保存していないため、これはoctree traversalではなく、Parquet statisticsのbboxを使った独立選択です。Automatic LODを無効にするとlevel sliderでL0から指定levelまでを固定表示できます。座標は描画時にdataset中心を引いてからFloat32へ変換するため、大きな測地座標でも表示精度を保ちます。
 
-HyparquetのRange fetch、ZSTD decode、row filter、座標復元、color buffer生成は専用Web Workerで実行します。取得済みの圧縮byte rangeはWorker内の64 MB LRU cacheで再利用し、カメラ移動時は新しく必要になったRow Group/pageだけを転送します。Row Groupは並列に読み、完了した順にposition/color `Float32Array`の所有権をmain threadへ移して即座に描画します。既存のRow Groupは次の選択が揃うまで残し、同じindexだけを差分置換してから不要分を除去するため、LOD更新時に全点群が消えません。対応するbboxも完了時に明表示されます。色変更でもRow Groupごとのbufferを維持し、中間の全点結合や配列sliceは行いません。
+HyparquetのRange fetch、ZSTD decode、bbox filter、座標復元、color buffer生成は専用Web Workerで実行します。取得済みの圧縮byte rangeはWorker内の64 MB LRU cacheで再利用し、カメラ移動時は新しく必要になったRow Group/pageだけを転送します。Row Groupは並列に読み、完了した順にposition/color `Float32Array`の所有権をmain threadへ移して即座に描画します。Parquetは列指向のまま読み、点ごとのobjectを作らず、1本のloopでbbox判定しながらXYZRGBのTypedArrayへ格納します。既存のRow Groupは次の選択が揃うまで残し、同じindexだけを差分置換してから不要分を除去するため、LOD更新時に全点群が消えません。対応するbboxも完了時に明表示されます。色変更でもRow Groupごとのbufferを維持し、中間の全点結合や配列sliceは行いません。
 
 Surface表示は同一の取得済みchunkを入力として、四角いpoint spriteを使う`Normal`と`Screen mesh`を切り替えられます。Screen meshは各点を円形にラスタライズした半解像度のpoint depth bufferを隣接gridとしてGPU上で三角形化し、設定値より長い辺をdepth discontinuityとして除去します。これは比較用のview-dependent surfaceであり、world-spaceの永続meshやexport用topologyは生成しません。
 
@@ -136,7 +136,7 @@ Viewer内部ではParquet/Workerを隠すreader、GPU resourceを所有するren
 
 ## ブラウザからRange query
 
-ZSTD decodeには `hyparquet-compressors` を同梱しています。ストレージ側は `Range` と `HEAD` に対応し、`Content-Length`, `Content-Range`, `Accept-Ranges` をCORSで公開する必要があります。ローカル確認用サーバーは次で起動できます。
+ZSTD decodeにはWASM版`zstddec`を使い、その他のcodecは`hyparquet-compressors`を利用します。ストレージ側は `Range` と `HEAD` に対応し、`Content-Length`, `Content-Range`, `Accept-Ranges` をCORSで公開する必要があります。ローカル確認用サーバーは次で起動できます。
 
 ```sh
 pnpm serve . 8080
@@ -151,13 +151,13 @@ const result = await cloud.queryWorld(
   2,
 );
 
-console.log(result.points);
+console.log(result.chunks); // resolutionとXYZRGB TypedArrayを持つchunk
 console.log(result.metrics);
 // bytesFetched, rangeRequests, rowGroupsRead/Pruned,
 // pointsInCandidateRowGroups, pointsMatched, elapsedMs
 ```
 
-整数bboxを既に持つ場合は `queryQuantized` を使います。返却点は量子化整数のままで、必要な点だけ `decodePosition` に渡して実座標へ戻せます。`metadataBytesFetched` はopen時のfooter取得量、各queryの `bytesFetched` はそのquery中に実際に返ったRange bodyの合計です（同一範囲の再取得も加算）。
+整数bboxを既に持つ場合は `queryQuantized` を使います。返却される各chunkの`x`、`y`、`z`は量子化整数の`Int32Array`、RGBは`Uint16Array`です。`metadataBytesFetched` はopen時のfooter取得量、各queryの `bytesFetched` はそのquery中に実際に返ったRange bodyの合計です（同一範囲の再取得も加算）。
 
 ## 検証
 

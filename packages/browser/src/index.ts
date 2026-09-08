@@ -1,20 +1,28 @@
 import {
   asyncBufferFromUrl,
   parquetMetadataAsync,
+  parquetScan,
   parquetSchema,
-  parquetReadObjects,
   readColumnIndex,
   readOffsetIndex,
   type AsyncBuffer,
+  type Compressors,
   type FileMetaData,
   type ParquetQueryFilter,
   type RowGroup,
   type SchemaElement,
 } from "hyparquet";
-import { compressors } from "hyparquet-compressors";
+import { loadCompressors } from "./compressors.js";
+import {
+  concatenatePointColumns,
+  POINT_COLUMNS,
+  readMatchingPointColumns,
+  type QuantizedPointColumns,
+} from "./point-columns.js";
 import { RangeCache, type RangeCoalescingOptions } from "./range-cache.js";
 
 export type { RangeCoalescingOptions } from "./range-cache.js";
+export type { QuantizedPointColumns } from "./point-columns.js";
 
 export interface PointCloudMetadata {
   version: string;
@@ -90,13 +98,13 @@ export interface QueryMetrics {
 }
 
 export interface QueryResult {
-  points: QuantizedPoint[];
+  chunks: QuantizedPointColumns[];
   metrics: QueryMetrics;
 }
 
 export interface QueryChunk {
   rowGroupIndex: number;
-  points: QuantizedPoint[];
+  points: QuantizedPointColumns;
 }
 
 export interface OpenOptions {
@@ -105,8 +113,6 @@ export interface OpenOptions {
   requestInit?: RequestInit;
   rangeCoalescing?: RangeCoalescingOptions;
 }
-
-const RENDER_COLUMNS = ["x", "y", "z", "red", "green", "blue"] as const;
 
 export class PointCloudParquet {
   readonly metadata: PointCloudMetadata;
@@ -118,6 +124,7 @@ export class PointCloudParquet {
 
   private constructor(
     private readonly file: RangeCache,
+    private readonly compressors: Compressors,
     metadata: PointCloudMetadata,
     parquetMetadata: FileMetaData,
     metadataBytesFetched: number,
@@ -130,18 +137,22 @@ export class PointCloudParquet {
   }
 
   static async open(url: string, options: OpenOptions = {}): Promise<PointCloudParquet> {
-    const file = await asyncBufferFromUrl({
-      url,
-      ...(options.byteLength === undefined ? {} : { byteLength: options.byteLength }),
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(options.requestInit === undefined ? {} : { requestInit: options.requestInit }),
-    });
+    const [file, compressors] = await Promise.all([
+      asyncBufferFromUrl({
+        url,
+        ...(options.byteLength === undefined ? {} : { byteLength: options.byteLength }),
+        ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+        ...(options.requestInit === undefined ? {} : { requestInit: options.requestInit }),
+      }),
+      loadCompressors(),
+    ]);
     const metered = new MeteredBuffer(file);
     const parquetMetadata = await parquetMetadataAsync(metered);
     const metadata = parsePointCloudMetadata(parquetMetadata);
     validateLevelLayout(metadata.level_row_group_ends, parquetMetadata);
     return new PointCloudParquet(
       new RangeCache(file, 64 * 1024 * 1024, options.rangeCoalescing),
+      compressors,
       metadata,
       parquetMetadata,
       metered.bytesFetched,
@@ -226,34 +237,35 @@ export class PointCloudParquet {
     // Per-query metering keeps metrics correct when callers issue concurrent queries.
     const metered = this.file.session();
     const started = performance.now();
-    const reads = candidates.map(async (index) => {
+    const reads = candidates.map(async (index): Promise<QuantizedPointColumns> => {
       const group = this.rowGroups[index]!;
       const fullyContained = boundsContain(bounds, group.quantizedBounds);
       // Do not put a global prefetch barrier in front of the query: each Row
       // Group can decode and render as soon as its own bytes arrive.
       if (fullyContained) {
         await metered.prefetch([
-          projectedColumnSpan(this.parquetMetadata.row_groups[index]!, RENDER_COLUMNS),
+          projectedColumnSpan(this.parquetMetadata.row_groups[index]!, POINT_COLUMNS),
         ]);
       }
-      const rows = await parquetReadObjects({
-          file: metered,
-          metadata: this.parquetMetadata,
-          columns: [...RENDER_COLUMNS],
-          filter,
-          rowStart: group.rowStart,
-          rowEnd: group.rowEnd,
-          compressors,
-          usePageIndex: !fullyContained,
-        });
-      const points = rows.map((row) => asQuantizedPoint(row, group.resolution));
+      const scan = await parquetScan({
+        file: metered,
+        metadata: this.parquetMetadata,
+        columns: [...POINT_COLUMNS],
+        ...(fullyContained ? {} : { pruningFilter: filter }),
+        rowStart: group.rowStart,
+        rowEnd: group.rowEnd,
+        compressors: this.compressors,
+        usePageIndex: !fullyContained,
+      });
+      const parts = await Promise.all(scan.ranges.map((range) =>
+        readMatchingPointColumns(scan, range, bounds, group.resolution)));
+      const points = concatenatePointColumns(parts, group.resolution);
       onChunk?.({ rowGroupIndex: index, points });
       return points;
     });
-    const points = (await Promise.all(reads)).flat();
+    const chunks = await Promise.all(reads);
     const elapsedMs = performance.now() - started;
     return {
-      points,
       metrics: {
         bytesFetched: metered.bytesFetched,
         rangeRequests: metered.requests,
@@ -264,9 +276,10 @@ export class PointCloudParquet {
           (sum, index) => sum + this.rowGroups[index]!.pointCount,
           0,
         ),
-        pointsMatched: points.length,
+        pointsMatched: chunks.reduce((sum, chunk) => sum + chunk.length, 0),
         elapsedMs,
       },
+      chunks,
     };
   }
 
@@ -306,7 +319,7 @@ export class PointCloudParquet {
 
   private emptyResult(): QueryResult {
     return {
-      points: [],
+      chunks: [],
       metrics: {
         bytesFetched: 0,
         rangeRequests: 0,
@@ -542,26 +555,6 @@ function validateRowGroupIndices(indices: number[], count: number): number[] {
   return sorted;
 }
 
-function asQuantizedPoint(row: Record<string, unknown>, resolution: number): QuantizedPoint {
-  const { x, y, z, red, green, blue } = row;
-  if (
-    typeof x !== "number" ||
-    typeof y !== "number" ||
-    typeof z !== "number"
-  ) {
-    throw new TypeError("unexpected point column types in Parquet data");
-  }
-  return {
-    resolution,
-    x,
-    y,
-    z,
-    red: optionalNumber(red, "red"),
-    green: optionalNumber(green, "green"),
-    blue: optionalNumber(blue, "blue"),
-  };
-}
-
 function validateLevelLayout(levelRowGroupEnds: number[], metadata: FileMetaData): void {
   let previous = 0;
   for (const end of levelRowGroupEnds) {
@@ -672,10 +665,4 @@ function unionBounds(bounds: WorldBounds[]): WorldBounds | null {
     min: [Math.min(union.min[0], item.min[0]), Math.min(union.min[1], item.min[1]), Math.min(union.min[2], item.min[2])],
     max: [Math.max(union.max[0], item.max[0]), Math.max(union.max[1], item.max[1]), Math.max(union.max[2], item.max[2])],
   }), { min: [...bounds[0]!.min], max: [...bounds[0]!.max] });
-}
-
-function optionalNumber(value: unknown, name: string): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== "number") throw new TypeError(`unexpected ${name} column type`);
-  return value;
 }

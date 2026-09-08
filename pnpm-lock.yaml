@@ -143,6 +143,9 @@ importers:
       hyparquet-compressors:
         specifier: 1.1.1
         version: 1.1.1
+      zstddec:
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -1005,6 +1008,9 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  zstddec@0.2.0:
+    resolution: {integrity: sha512-oyPnDa1X5c13+Y7mA/FDMNJrn4S8UNBe0KCqtDmor40Re7ALrPN6npFwyYVRRh+PqozZQdeg23QtbcamZnG5rA==}
+
 snapshots:
 
   '@dimforge/rapier3d-compat@0.12.0': {}
@@ -1637,3 +1643,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  zstddec@0.2.0: {}

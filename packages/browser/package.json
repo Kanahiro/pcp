@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "hyparquet": "1.29.2",
-    "hyparquet-compressors": "1.1.1"
+    "hyparquet-compressors": "1.1.1",
+    "zstddec": "^0.2.0"
   },
   "devDependencies": {
     "typescript": "5.9.3",

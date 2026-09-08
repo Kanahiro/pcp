@@ -1,5 +1,26 @@
 # PCP / COPC reader benchmark
 
+## 2026-09-08: columnar reader + WASM ZSTD
+
+`parquetReadObjects`による行object化と汎用filterを廃止した。Page Indexで絞った物理row rangeからXYZRGB列を直接読み、単一loopでbbox判定しながらTypedArrayへ格納する。ZSTD decoderは純JavaScriptの`fzstd`からWASMの`zstddec`へ変更した。
+
+同一PCP、同一query、warmup 1回、計測5回の中央値で、PCPの5 query合計は2,862 msから1,040 msへ63.6%短縮した。転送量、一致点数、Range call数は変更前と一致する。今回同時に測ったCOPCの3,567 msに対してPCPは70.8%短い。
+
+| query | 旧PCP | columnar PCP | COPC | PCP短縮率 | PCP / COPC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cube | 350 ms | 155 ms | 748 ms | 55.8% | 0.207 |
+| thin-x | 208 ms | 93 ms | 442 ms | 55.3% | 0.210 |
+| thin-y | 316 ms | 133 ms | 460 ms | 58.0% | 0.289 |
+| thin-z | 784 ms | 282 ms | 953 ms | 64.0% | 0.296 |
+| large | 1,203 ms | 377 ms | 964 ms | 68.6% | 0.392 |
+| **合計** | **2,862 ms** | **1,040 ms** | **3,567 ms** | **63.6%** | **0.292** |
+
+広域queryの逆転は解消し、`large`でもPCPがCOPCより60.8%短い。ZSTDだけを同じ列decode経路で交互に5回測ったmedianは、純JS 516 ms、WASM 467 msで9.6%短縮だった。全体改善の主因は行object、汎用filter、二重object変換、最終`flat()`の除去である。
+
+生の測定値: [columnar + WASM ZSTD](copc-comparison-columnar-20260908.json)
+
+## 2026-09-06: row-oriented reader
+
 測定日: 2026-09-06
 
 ## 結論

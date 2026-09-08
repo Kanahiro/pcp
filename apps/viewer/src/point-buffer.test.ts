@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PointCloudMetadata, QuantizedPoint } from "@pointcloud-parquet/browser";
+import type { PointCloudMetadata, QuantizedPointColumns } from "@pointcloud-parquet/browser";
 import { buildPointBuffers, elevationColor, srgbToLinear } from "./point-buffer";
 
 const metadata: PointCloudMetadata = {
@@ -14,20 +14,41 @@ const metadata: PointCloudMetadata = {
 
 describe("buildPointBuffers", () => {
   it("keeps Parquet coordinates quantized for the integer GPU attribute", () => {
-    const point: QuantizedPoint = { resolution: 0, x: -123, y: 456, z: 789, red: null, green: null, blue: null };
-    const result = buildPointBuffers([point], metadata, "elevation");
+    const points = columns({ x: [-123], y: [456], z: [789] });
+    const result = buildPointBuffers(points, metadata, "elevation");
     expect(result.quantizedPositions).toBeInstanceOf(Int32Array);
     expect(Array.from(result.quantizedPositions)).toEqual([-123, 456, 789]);
   });
 
   it("uses LAS 16-bit RGB values", () => {
-    const point: QuantizedPoint = { resolution: 0, x: 0, y: 0, z: 0, red: 65_535, green: 0, blue: 32_768 };
-    const result = buildPointBuffers([point], metadata, "rgb");
+    const points = columns({ red: [65_535], green: [0], blue: [32_768] });
+    const result = buildPointBuffers(points, metadata, "rgb");
     expect(result.colors[0]).toBeCloseTo(1);
     expect(result.colors[1]).toBe(0);
     expect(result.colors[2]).toBeCloseTo(srgbToLinear(32_768 / 65_535));
   });
 });
+
+function columns(values: {
+  x?: number[];
+  y?: number[];
+  z?: number[];
+  red?: number[];
+  green?: number[];
+  blue?: number[];
+}): QuantizedPointColumns {
+  const length = values.x?.length ?? values.red?.length ?? 1;
+  return {
+    resolution: 0,
+    length,
+    x: values.x ? new Int32Array(values.x) : new Int32Array(length),
+    y: values.y ? new Int32Array(values.y) : new Int32Array(length),
+    z: values.z ? new Int32Array(values.z) : new Int32Array(length),
+    red: values.red ? new Uint16Array(values.red) : new Uint16Array(length),
+    green: values.green ? new Uint16Array(values.green) : new Uint16Array(length),
+    blue: values.blue ? new Uint16Array(values.blue) : new Uint16Array(length),
+  };
+}
 
 describe("elevationColor", () => {
   it("clamps values outside the elevation range", () => {

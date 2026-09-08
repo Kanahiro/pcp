@@ -1,17 +1,19 @@
-import { asyncBufferFromUrl, parquetMetadataAsync, parquetSchema, parquetReadObjects, readColumnIndex, readOffsetIndex, } from "hyparquet";
-import { compressors } from "hyparquet-compressors";
+import { asyncBufferFromUrl, parquetMetadataAsync, parquetScan, parquetSchema, readColumnIndex, readOffsetIndex, } from "hyparquet";
+import { loadCompressors } from "./compressors.js";
+import { concatenatePointColumns, POINT_COLUMNS, readMatchingPointColumns, } from "./point-columns.js";
 import { RangeCache } from "./range-cache.js";
-const RENDER_COLUMNS = ["x", "y", "z", "red", "green", "blue"];
 export class PointCloudParquet {
     file;
+    compressors;
     metadata;
     parquetMetadata;
     metadataBytesFetched;
     rowGroups;
     resolutions;
     pageBoundsPromise;
-    constructor(file, metadata, parquetMetadata, metadataBytesFetched) {
+    constructor(file, compressors, metadata, parquetMetadata, metadataBytesFetched) {
         this.file = file;
+        this.compressors = compressors;
         this.metadata = metadata;
         this.parquetMetadata = parquetMetadata;
         this.metadataBytesFetched = metadataBytesFetched;
@@ -19,17 +21,20 @@ export class PointCloudParquet {
         this.resolutions = buildResolutionInfo(this.rowGroups, metadata);
     }
     static async open(url, options = {}) {
-        const file = await asyncBufferFromUrl({
-            url,
-            ...(options.byteLength === undefined ? {} : { byteLength: options.byteLength }),
-            ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-            ...(options.requestInit === undefined ? {} : { requestInit: options.requestInit }),
-        });
+        const [file, compressors] = await Promise.all([
+            asyncBufferFromUrl({
+                url,
+                ...(options.byteLength === undefined ? {} : { byteLength: options.byteLength }),
+                ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+                ...(options.requestInit === undefined ? {} : { requestInit: options.requestInit }),
+            }),
+            loadCompressors(),
+        ]);
         const metered = new MeteredBuffer(file);
         const parquetMetadata = await parquetMetadataAsync(metered);
         const metadata = parsePointCloudMetadata(parquetMetadata);
         validateLevelLayout(metadata.level_row_group_ends, parquetMetadata);
-        return new PointCloudParquet(new RangeCache(file, 64 * 1024 * 1024, options.rangeCoalescing), metadata, parquetMetadata, metered.bytesFetched);
+        return new PointCloudParquet(new RangeCache(file, 64 * 1024 * 1024, options.rangeCoalescing), compressors, metadata, parquetMetadata, metered.bytesFetched);
     }
     worldToQuantized(bounds) {
         const { scale, offset } = this.metadata;
@@ -85,27 +90,27 @@ export class PointCloudParquet {
             // Group can decode and render as soon as its own bytes arrive.
             if (fullyContained) {
                 await metered.prefetch([
-                    projectedColumnSpan(this.parquetMetadata.row_groups[index], RENDER_COLUMNS),
+                    projectedColumnSpan(this.parquetMetadata.row_groups[index], POINT_COLUMNS),
                 ]);
             }
-            const rows = await parquetReadObjects({
+            const scan = await parquetScan({
                 file: metered,
                 metadata: this.parquetMetadata,
-                columns: [...RENDER_COLUMNS],
-                filter,
+                columns: [...POINT_COLUMNS],
+                ...(fullyContained ? {} : { pruningFilter: filter }),
                 rowStart: group.rowStart,
                 rowEnd: group.rowEnd,
-                compressors,
+                compressors: this.compressors,
                 usePageIndex: !fullyContained,
             });
-            const points = rows.map((row) => asQuantizedPoint(row, group.resolution));
+            const parts = await Promise.all(scan.ranges.map((range) => readMatchingPointColumns(scan, range, bounds, group.resolution)));
+            const points = concatenatePointColumns(parts, group.resolution);
             onChunk?.({ rowGroupIndex: index, points });
             return points;
         });
-        const points = (await Promise.all(reads)).flat();
+        const chunks = await Promise.all(reads);
         const elapsedMs = performance.now() - started;
         return {
-            points,
             metrics: {
                 bytesFetched: metered.bytesFetched,
                 rangeRequests: metered.requests,
@@ -113,9 +118,10 @@ export class PointCloudParquet {
                 rowGroupsRead: candidates.length,
                 rowGroupsPruned: this.parquetMetadata.row_groups.length - candidates.length,
                 pointsInCandidateRowGroups: candidates.reduce((sum, index) => sum + this.rowGroups[index].pointCount, 0),
-                pointsMatched: points.length,
+                pointsMatched: chunks.reduce((sum, chunk) => sum + chunk.length, 0),
                 elapsedMs,
             },
+            chunks,
         };
     }
     async readPageBounds() {
@@ -149,7 +155,7 @@ export class PointCloudParquet {
     }
     emptyResult() {
         return {
-            points: [],
+            chunks: [],
             metrics: {
                 bytesFetched: 0,
                 rangeRequests: 0,
@@ -342,23 +348,6 @@ function validateRowGroupIndices(indices, count) {
     }
     return sorted;
 }
-function asQuantizedPoint(row, resolution) {
-    const { x, y, z, red, green, blue } = row;
-    if (typeof x !== "number" ||
-        typeof y !== "number" ||
-        typeof z !== "number") {
-        throw new TypeError("unexpected point column types in Parquet data");
-    }
-    return {
-        resolution,
-        x,
-        y,
-        z,
-        red: optionalNumber(red, "red"),
-        green: optionalNumber(green, "green"),
-        blue: optionalNumber(blue, "blue"),
-    };
-}
 function validateLevelLayout(levelRowGroupEnds, metadata) {
     let previous = 0;
     for (const end of levelRowGroupEnds) {
@@ -461,11 +450,4 @@ function unionBounds(bounds) {
         min: [Math.min(union.min[0], item.min[0]), Math.min(union.min[1], item.min[1]), Math.min(union.min[2], item.min[2])],
         max: [Math.max(union.max[0], item.max[0]), Math.max(union.max[1], item.max[1]), Math.max(union.max[2], item.max[2])],
     }), { min: [...bounds[0].min], max: [...bounds[0].max] });
-}
-function optionalNumber(value, name) {
-    if (value === null || value === undefined)
-        return null;
-    if (typeof value !== "number")
-        throw new TypeError(`unexpected ${name} column type`);
-    return value;
 }
