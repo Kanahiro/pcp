@@ -36,7 +36,7 @@ jobs:
           require-lockfile: true
 
       - name: Build demo
-        run: pnpm --filter @pointcloud-parquet/viewer build
+        run: pnpm build
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
