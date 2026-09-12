@@ -14,18 +14,20 @@ LAS/LAZ点群を、段階的な詳細表示（LOD）と3次元bboxによる部�
 
 LODは連続したRow Groupの範囲として記録するため、点ごとのLOD列やoctreeの親子関係は持ちません。各手法そのものの発明ではなく、点群向けの保存配置と読み出しの組み合わせを検証するPoCです。
 
-## COGPに対するpros / cons
+## COPCに対するpros / cons
 
-[COGP（Cloud Optimized GeoParquet）](https://github.com/Kanahiro/cloud-optimized-geoparquet)は、GeoParquetの地物を粗いlevelから順に並べ、重複なく段階的に読むためのプロファイルです。このプロジェクトもその考え方を共有し、保存形式をLAS由来の3D点群に特化しています。
+[COPC（Cloud Optimized Point Cloud）](https://copc.io/)は、点群をoctreeで整理して単一のLAZ 1.4ファイルに格納する形式です。どちらもHTTP Rangeによる空間部分取得と段階的な詳細表示を目的としますが、本プロジェクトはParquetの列指向配置と標準インデックスを使います。
 
-| 観点 | このプロジェクトの利点（pros） | トレードオフ（cons） |
+| 観点 | このプロジェクトの利点（pros） | COPCに対する弱点（cons） |
 | --- | --- | --- |
-| 座標表現 | 量子化整数XYZを独立した列で保存でき、軸ごとの圧縮・統計・列選択を使える | GeoParquetのgeometry列と`geo`メタデータを持たず、GeoParquet／COGPとしての互換性はない |
-| 空間取得 | 3D STRとXYZのPage Indexで、高さを含むbboxをページ単位で絞り込める | 効率はquery形状と配置に依存し、細かなRange取得にはリクエスト数の負担がある |
-| LOD | 3D voxelに基づく代表点選択と、voxel寸法からの幾何誤差上限を利用できる | 点群専用であり、線・ポリゴンを含む汎用地物には対応しない |
-| 利用環境 | Parquetの数値列として分析でき、付属リーダーでXYZRGBを直接TypedArrayへ読める | 座標復元とLOD解釈には独自の`point_cloud`メタデータへの対応が必要 |
+| 分析・属性選択 | XYZや属性を独立した列として扱い、DuckDBなどで必要列だけを分析できる | LAS/LAZ互換性がなく、既存のCOPCリーダーでは読めない。座標復元とLODには独自メタデータの解釈が必要 |
+| 部分取得 | Row Group統計とPage Indexでbbox外を除外し、必要な列・ページを取得できる | 取得単位が細かく、Range数と初期メタデータ取得量が増える場合がある |
+| 空間構造・LOD | LOD境界とParquet標準統計で構成でき、専用のoctreeインデックスを持たずに済む | COPCのような親子関係を辿る階層探索はできず、Row GroupごとにbboxとLODを判定する |
+| 圧縮・保存 | 列ごとにencodingを選び、空間配置とZSTDを組み合わせられる | 既存の圧縮実験ではCOPCより約20%大きい。VLR/EVLRも複製しないため、LAS固有メタデータの保持に制約がある |
 
-COGPとの速度・圧縮率の直接比較は未実施です。既存の[COPC比較](benchmarks/copc-comparison.md)は、別形式であるCloud Optimized Point Cloudとの測定です。
+[既存ベンチマーク](benchmarks/copc-comparison.md)では、約719万点の入力に対する5種類のXYZRGB bbox queryで、転送量合計はParquet 37.0 MB／COPC 81.0 MB、Range数は330／54でした。2026-09-08のリーダー比較では、各queryの中央値の合計が1,040 ms／3,567 msでした。
+
+これは64K Row Group／4Kページの構成と、比較に使用したリーダーでの結果です。LODのsamplingと一致点数は異なり、ネットワーク遅延も含まないため、形式全般の速度優位を示すものではありません。COPCのLAZ 1.4も属性選択に対応しており、「COPCでは常に全属性の取得・展開が必要」という比較ではありません。
 
 ## Parquetスキーマ
 
