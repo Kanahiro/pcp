@@ -5,10 +5,16 @@ import { basename, resolve } from "node:path";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 
-import { Bounds, Copc, Key, Las } from "copc";
+import { Copc, Key, Las } from "copc";
+import { loadHierarchy, selectCopcNodes, mapPool, aggregate } from "./benchmark-common.mjs";
+import { createBenchmarkHttp } from "./benchmark-http.mjs";
+
+let httpTransport;
 import { PointCloudParquet } from "../packages/browser/dist/index.js";
 
 const usage = `usage: node scripts/benchmark-copc.mjs PARQUET COPC [options]
+
+Inputs may be local paths or HTTP(S) URLs.
 
 Options:
   --level N         Parquet maximum additive LOD level
@@ -16,6 +22,7 @@ Options:
   --repeats N       Measured cold-cache runs per query (default: 3)
   --warmup N        Unmeasured runs per query (default: 1)
   --concurrency N   Independent laz-perf decoders (default: 4)
+  --http-connections N  HTTP/1.1 connections per origin (default: 6; 0: unlimited)
   --range-gap N     Parquet coalescing gap in bytes (default: reader default)
   --range-size N    Parquet combined request cap in bytes (default: reader default)
   --output FILE     Also write the JSON result to FILE`;
@@ -30,13 +37,14 @@ function parseArguments(argv) {
   if (argv[0] === "--") argv = argv.slice(1);
   if (argv.length < 2) fail("PARQUET and COPC are required");
   const options = {
-    parquet: resolve(argv[0]),
-    copc: resolve(argv[1]),
+    parquet: isHttp(argv[0]) ? argv[0] : resolve(argv[0]),
+    copc: isHttp(argv[1]) ? argv[1] : resolve(argv[1]),
     level: undefined,
     copcDepth: undefined,
     repeats: 3,
     warmup: 1,
     concurrency: 4,
+    httpConnections: 6,
     rangeGap: undefined,
     rangeSize: undefined,
     output: undefined,
@@ -56,20 +64,50 @@ function parseArguments(argv) {
     else if (flag === "--repeats") options.repeats = number;
     else if (flag === "--warmup") options.warmup = number;
     else if (flag === "--concurrency") options.concurrency = number;
+    else if (flag === "--http-connections") options.httpConnections = number;
     else if (flag === "--range-gap") options.rangeGap = number;
     else if (flag === "--range-size") options.rangeSize = number;
     else fail(`unknown option: ${flag}`);
   }
   if (options.repeats < 1) fail("--repeats must be at least 1");
   if (options.warmup < 0) fail("--warmup must be non-negative");
+  if (options.httpConnections < 0) fail("--http-connections must be non-negative");
   if (options.concurrency < 1) fail("--concurrency must be at least 1");
   if (options.rangeGap !== undefined && options.rangeGap < 0) fail("--range-gap must be non-negative");
   if (options.rangeSize !== undefined && options.rangeSize < 1) fail("--range-size must be at least 1");
   return options;
 }
 
+function isHttp(path) {
+  return /^https?:\/\//.test(path);
+}
+
+async function sourceSize(path) {
+  if (!isHttp(path)) return statSync(path).size;
+  const response = await httpTransport.fetch(path, { method: "HEAD" });
+  const length = response.headers.get("Content-Length");
+  const size = Number(length);
+  if (!response.ok || length === null || !Number.isSafeInteger(size) || size <= 0) {
+    throw new Error(`HEAD requires a valid Content-Length: ${path}`);
+  }
+  return size;
+}
+
 async function readRange(path, begin, end) {
   if (begin < 0 || end < begin) throw new RangeError("invalid byte range");
+  if (isHttp(path)) {
+    const response = await httpTransport.fetch(path, { headers: { Range: `bytes=${begin}-${end - 1}` } });
+    if (response.status !== 206) {
+      await response.body?.cancel();
+      throw new Error(`expected HTTP 206 for ${path}, got ${response.status}`);
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length !== end - begin
+      || !response.headers.get("Content-Range")?.startsWith(`bytes ${begin}-${end - 1}/`)) {
+      throw new Error(`invalid HTTP range response from ${path}`);
+    }
+    return bytes;
+  }
   const file = await open(path, "r");
   try {
     const bytes = Buffer.allocUnsafe(end - begin);
@@ -107,26 +145,6 @@ function createMeteredGetter(path) {
     return bytes;
   };
   return { getter, metrics };
-}
-
-async function loadHierarchy(getter, rootPage) {
-  const nodes = {};
-  const pending = [rootPage];
-  const seen = new Set();
-  let hierarchyPages = 0;
-  while (pending.length > 0) {
-    const page = pending.pop();
-    const id = `${page.pageOffset}:${page.pageLength}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    hierarchyPages += 1;
-    const subtree = await Copc.loadHierarchyPage(getter, page);
-    Object.assign(nodes, subtree.nodes);
-    for (const child of Object.values(subtree.pages)) {
-      if (child !== undefined) pending.push(child);
-    }
-  }
-  return { nodes, hierarchyPages };
 }
 
 function cumulativeCopcPoints(nodes) {
@@ -193,35 +211,10 @@ function buildQueries(bounds, center) {
   ].map(([name, fractions]) => ({ name, bounds: centeredBounds(bounds, center, fractions) }));
 }
 
-function overlaps(a, b) {
-  return a[3] >= b.min[0] && a[0] <= b.max[0]
-    && a[4] >= b.min[1] && a[1] <= b.max[1]
-    && a[5] >= b.min[2] && a[2] <= b.max[2];
-}
-
-function selectCopcNodes(copc, nodes, bounds, maxDepth) {
-  return Object.entries(nodes).flatMap(([key, node]) => {
-    if (node === undefined || Key.parse(key)[0] > maxDepth) return [];
-    return overlaps(Bounds.stepTo([...copc.info.cube], Key.parse(key)), bounds) ? [[key, node]] : [];
-  });
-}
-
-async function mapPool(items, workers, callback) {
-  let cursor = 0;
-  await Promise.all(workers.map(async (worker, workerIndex) => {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await callback(items[index], worker, workerIndex);
-    }
-  }));
-}
-
 async function openParquet(path, byteLength, rangeCoalescing) {
   const started = performance.now();
-  const cloud = await PointCloudParquet.open("local://cloud.parquet", {
-    byteLength,
-    fetch: createLocalFetch(path, byteLength),
+  const cloud = await PointCloudParquet.open(isHttp(path) ? path : "local://cloud.parquet", {
+    ...(isHttp(path) ? { fetch: httpTransport.fetch } : { byteLength, fetch: createLocalFetch(path, byteLength) }),
     rangeCoalescing,
   });
   return { cloud, elapsedMs: performance.now() - started };
@@ -296,7 +289,7 @@ async function representativeCenter(path, copc, nodes, lazPerf) {
   const root = nodes["0-0-0-0"]
     ?? Object.entries(nodes).sort(([left], [right]) => Key.parse(left)[0] - Key.parse(right)[0])[0]?.[1];
   if (root === undefined) throw new Error("COPC hierarchy contains no point nodes");
-  const view = await Copc.loadPointDataView(path, copc, root, {
+  const view = await Copc.loadPointDataView(createMeteredGetter(path).getter, copc, root, {
     lazPerf,
     include: ["X", "Y", "Z"],
   });
@@ -308,28 +301,15 @@ async function representativeCenter(path, copc, nodes, lazPerf) {
   });
 }
 
-function median(values) {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle];
-}
-
-function aggregate(samples) {
-  const numeric = Object.keys(samples[0]).filter((key) =>
-    samples.every((sample) => typeof sample[key] === "number"));
-  return Object.fromEntries(numeric.map((key) => [key, median(samples.map((sample) => sample[key]))]));
-}
-
 function closeEnough(left, right, tolerance) {
   return Math.abs(left - right) <= tolerance;
 }
 
 async function main() {
   const options = parseArguments(process.argv.slice(2));
-  const parquetBytes = statSync(options.parquet).size;
-  const copcBytes = statSync(options.copc).size;
+  httpTransport = createBenchmarkHttp(options.httpConnections);
+  const parquetBytes = await sourceSize(options.parquet);
+  const copcBytes = await sourceSize(options.copc);
   const rangeCoalescing = {
     ...(options.rangeGap === undefined ? {} : { maxGapBytes: options.rangeGap }),
     ...(options.rangeSize === undefined ? {} : { maxRequestBytes: options.rangeSize }),
@@ -364,20 +344,30 @@ async function main() {
       // Alternate order to avoid giving either format a systematic cache/thermal advantage.
       const formats = run % 2 === 0 ? ["parquet", "copc"] : ["copc", "parquet"];
       for (const format of formats) {
+        // Measure each complete load directly; summing phase medians is not equivalent.
+        const loadStarted = performance.now();
         if (format === "parquet") {
           const opened = await openParquet(options.parquet, parquetBytes, rangeCoalescing);
           const result = await opened.cloud.queryWorld(query.bounds, lods.level);
+          const loadElapsedMs = performance.now() - loadStarted;
           if (run >= options.warmup) {
             parquetSamples.push({
               openElapsedMs: opened.elapsedMs,
               metadataBytesFetched: opened.cloud.metadataBytesFetched,
               ...result.metrics,
+              loadElapsedMs,
+              totalBytesFetched: opened.cloud.metadataBytesFetched + result.metrics.bytesFetched,
             });
           }
         } else {
           const opened = await openCopc(options.copc);
           const result = await queryCopc(opened, query.bounds, lods.copcDepth, decoders);
-          if (run >= options.warmup) copcSamples.push(result);
+          const loadElapsedMs = performance.now() - loadStarted;
+          if (run >= options.warmup) copcSamples.push({
+            ...result,
+            loadElapsedMs,
+            totalBytesFetched: result.metadataBytesFetched + result.bytesFetched,
+          });
         }
       }
     }
@@ -388,7 +378,10 @@ async function main() {
       bounds: [...query.bounds.min, ...query.bounds.max],
       parquet,
       copc,
+      samples: { parquet: parquetSamples, copc: copcSamples },
       comparison: {
+        parquetToCopcLoadElapsed: parquet.loadElapsedMs / copc.loadElapsedMs,
+        parquetToCopcTotalBytes: parquet.totalBytesFetched / copc.totalBytesFetched,
         parquetToCopcBytes: parquet.bytesFetched / copc.bytesFetched,
         parquetToCopcElapsed: parquet.elapsedMs / copc.elapsedMs,
         parquetBytesPerMatchedPoint: parquet.bytesFetched / Math.max(1, parquet.pointsMatched),
@@ -414,7 +407,14 @@ async function main() {
         maxGapBytes: options.rangeGap ?? 32_768,
         maxRequestBytes: options.rangeSize ?? 2_097_152,
       },
-      transport: "range-equivalent local file reads; cold application cache per sample",
+      transport: {
+        parquet: isHttp(options.parquet) ? "HTTP Range (including HEAD at open)" : "local file ranges",
+        copc: isHttp(options.copc) ? "HTTP Range" : "local file ranges",
+        httpClient: "node:http(s) Agent; HTTP/1.1, no pipelining, buffered bodies, direct URLs only",
+        connectionsPerOrigin: options.httpConnections || null,
+        cache: "cold reader cache per sample; OS, connection and server caches are not reset",
+      },
+      loadTiming: "wall time from before reader open through query completion, including metadata and hierarchy reads; includes network waits for HTTP sources; excludes module/decoder startup, discovery, rendering, and OS cache clearing",
     },
     dataset: {
       parquet: basename(options.parquet),
@@ -449,7 +449,7 @@ async function main() {
   process.stdout.write(json);
 }
 
-main().catch((error) => {
+main().finally(() => httpTransport?.close()).catch((error) => {
   console.error(error instanceof Error ? error.stack : error);
   process.exitCode = 1;
 });

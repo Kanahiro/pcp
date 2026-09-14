@@ -1,0 +1,478 @@
+{
+  "source": "benchmarks/copc-comparison-browser-e2e-20260914.json",
+  "measuredAt": "2026-09-14T04:37:10.236Z",
+  "aggregation": "For each query/format, select the actual trial at the median total duration, then use that same trial for all phases; totals sum those trials. Phases are not independent medians.",
+  "limitations": "Network and decoding overlap and are not separated. Startup/delivery is a residual including COPC explicit decoder initialization; WebGL initialization overlaps worker work. Next frame is not physical display scan-out.",
+  "phaseDefinitions": {
+    "startupAndDeliveryMs": "起動・初期化・転送等（dataReadyMs − loadElapsedMs − bufferBuildMsの残差）",
+    "metadataOpenMs": "メタデータ取得・解析（Parquetのdecoder初期化も含む）",
+    "queryMs": "点データ通信・展開・bbox判定・XYZRGB配列生成",
+    "colorAndBufferMs": "描画用バッファ生成・色変換",
+    "sceneAndFrameWaitMs": "メインスレッドのscene準備・描画開始フレーム待ち",
+    "renderAndGpuMs": "描画命令・GPU転送・GPU完了待ち",
+    "nextFrameWaitMs": "GPU完了後の次フレーム待ち"
+  },
+  "queries": [
+    {
+      "name": "cube",
+      "parquet": {
+        "selectedSampleIndex": 2,
+        "totalMs": 179.60000002384186,
+        "phases": {
+          "startupAndDeliveryMs": 20,
+          "metadataOpenMs": 6.699999988079071,
+          "queryMs": 135.80000001192093,
+          "colorAndBufferMs": 4.5,
+          "sceneAndFrameWaitMs": 0.4000000059604645,
+          "renderAndGpuMs": 2.7000000178813934,
+          "nextFrameWaitMs": 9.5
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 20.400000005960464,
+            "metadataOpenMs": 6.9000000059604645,
+            "queryMs": 138.30000001192093,
+            "colorAndBufferMs": 5.199999988079071,
+            "sceneAndFrameWaitMs": 0.3999999761581421,
+            "renderAndGpuMs": 3.100000023841858,
+            "nextFrameWaitMs": 6.5
+          },
+          {
+            "startupAndDeliveryMs": 21.099999964237213,
+            "metadataOpenMs": 6.700000017881393,
+            "queryMs": 137.5,
+            "colorAndBufferMs": 5.300000011920929,
+            "sceneAndFrameWaitMs": 0.20000001788139343,
+            "renderAndGpuMs": 3.0999999940395355,
+            "nextFrameWaitMs": 5.5
+          },
+          {
+            "startupAndDeliveryMs": 20,
+            "metadataOpenMs": 6.699999988079071,
+            "queryMs": 135.80000001192093,
+            "colorAndBufferMs": 4.5,
+            "sceneAndFrameWaitMs": 0.4000000059604645,
+            "renderAndGpuMs": 2.7000000178813934,
+            "nextFrameWaitMs": 9.5
+          }
+        ]
+      },
+      "copc": {
+        "selectedSampleIndex": 2,
+        "totalMs": 597.5,
+        "phases": {
+          "startupAndDeliveryMs": 24.299999952316284,
+          "metadataOpenMs": 4,
+          "queryMs": 554.9000000059605,
+          "colorAndBufferMs": 4.200000017881393,
+          "sceneAndFrameWaitMs": 0.30000001192092896,
+          "renderAndGpuMs": 2.5,
+          "nextFrameWaitMs": 7.300000011920929
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 23.899999976158142,
+            "metadataOpenMs": 3.800000011920929,
+            "queryMs": 557.5999999940395,
+            "colorAndBufferMs": 4.4000000059604645,
+            "sceneAndFrameWaitMs": 0.4000000059604645,
+            "renderAndGpuMs": 2.5,
+            "nextFrameWaitMs": 5
+          },
+          {
+            "startupAndDeliveryMs": 25.399999976158142,
+            "metadataOpenMs": 3.2999999821186066,
+            "queryMs": 554.2000000178814,
+            "colorAndBufferMs": 4.200000017881393,
+            "sceneAndFrameWaitMs": 0.20000001788139343,
+            "renderAndGpuMs": 2.5999999940395355,
+            "nextFrameWaitMs": 6.799999982118607
+          },
+          {
+            "startupAndDeliveryMs": 24.299999952316284,
+            "metadataOpenMs": 4,
+            "queryMs": 554.9000000059605,
+            "colorAndBufferMs": 4.200000017881393,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 2.5,
+            "nextFrameWaitMs": 7.300000011920929
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-x",
+      "parquet": {
+        "selectedSampleIndex": 1,
+        "totalMs": 129.2999999821186,
+        "phases": {
+          "startupAndDeliveryMs": 21.499999970197678,
+          "metadataOpenMs": 6.700000017881393,
+          "queryMs": 97.19999998807907,
+          "colorAndBufferMs": 1.7000000178813934,
+          "sceneAndFrameWaitMs": 0.19999998807907104,
+          "renderAndGpuMs": 1.9000000059604645,
+          "nextFrameWaitMs": 0.09999999403953552
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 20.099999994039536,
+            "metadataOpenMs": 6.699999988079071,
+            "queryMs": 96,
+            "colorAndBufferMs": 1.7000000178813934,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 1.800000011920929,
+            "nextFrameWaitMs": 2.5999999940395355
+          },
+          {
+            "startupAndDeliveryMs": 21.499999970197678,
+            "metadataOpenMs": 6.700000017881393,
+            "queryMs": 97.19999998807907,
+            "colorAndBufferMs": 1.7000000178813934,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 1.9000000059604645,
+            "nextFrameWaitMs": 0.09999999403953552
+          },
+          {
+            "startupAndDeliveryMs": 19.899999976158142,
+            "metadataOpenMs": 6.700000017881393,
+            "queryMs": 98.40000000596046,
+            "colorAndBufferMs": 1.699999988079071,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 1.699999988079071,
+            "nextFrameWaitMs": 1.800000011920929
+          }
+        ]
+      },
+      "copc": {
+        "selectedSampleIndex": 0,
+        "totalMs": 430.39999997615814,
+        "phases": {
+          "startupAndDeliveryMs": 24.80000001192093,
+          "metadataOpenMs": 3.0999999940395355,
+          "queryMs": 390.7999999821186,
+          "colorAndBufferMs": 1.800000011920929,
+          "sceneAndFrameWaitMs": 0.19999998807907104,
+          "renderAndGpuMs": 2.0999999940395355,
+          "nextFrameWaitMs": 7.5999999940395355
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 24.80000001192093,
+            "metadataOpenMs": 3.0999999940395355,
+            "queryMs": 390.7999999821186,
+            "colorAndBufferMs": 1.800000011920929,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 2.0999999940395355,
+            "nextFrameWaitMs": 7.5999999940395355
+          },
+          {
+            "startupAndDeliveryMs": 24.5,
+            "metadataOpenMs": 3.4000000059604645,
+            "queryMs": 395.09999999403954,
+            "colorAndBufferMs": 1.800000011920929,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 1.800000011920929,
+            "nextFrameWaitMs": 2.2999999821186066
+          },
+          {
+            "startupAndDeliveryMs": 26.000000059604645,
+            "metadataOpenMs": 3.699999988079071,
+            "queryMs": 392.69999998807907,
+            "colorAndBufferMs": 1.899999976158142,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 1.800000011920929,
+            "nextFrameWaitMs": 4.800000011920929
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-y",
+      "parquet": {
+        "selectedSampleIndex": 2,
+        "totalMs": 165,
+        "phases": {
+          "startupAndDeliveryMs": 19.30000001192093,
+          "metadataOpenMs": 6.5,
+          "queryMs": 134.69999998807907,
+          "colorAndBufferMs": 2,
+          "sceneAndFrameWaitMs": 0.20000001788139343,
+          "renderAndGpuMs": 2.199999988079071,
+          "nextFrameWaitMs": 0.09999999403953552
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 19.5,
+            "metadataOpenMs": 6.5999999940395355,
+            "queryMs": 133.2000000178814,
+            "colorAndBufferMs": 2.0999999940395355,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 1.9000000059604645,
+            "nextFrameWaitMs": 0.19999998807907104
+          },
+          {
+            "startupAndDeliveryMs": 20.400000005960464,
+            "metadataOpenMs": 6.700000017881393,
+            "queryMs": 134,
+            "colorAndBufferMs": 2.199999988079071,
+            "sceneAndFrameWaitMs": 0.29999998211860657,
+            "renderAndGpuMs": 1.9000000059604645,
+            "nextFrameWaitMs": 13.400000005960464
+          },
+          {
+            "startupAndDeliveryMs": 19.30000001192093,
+            "metadataOpenMs": 6.5,
+            "queryMs": 134.69999998807907,
+            "colorAndBufferMs": 2,
+            "sceneAndFrameWaitMs": 0.20000001788139343,
+            "renderAndGpuMs": 2.199999988079071,
+            "nextFrameWaitMs": 0.09999999403953552
+          }
+        ]
+      },
+      "copc": {
+        "selectedSampleIndex": 0,
+        "totalMs": 447.7999999821186,
+        "phases": {
+          "startupAndDeliveryMs": 24.19999998807907,
+          "metadataOpenMs": 3.7000000178813934,
+          "queryMs": 410.7999999821186,
+          "colorAndBufferMs": 2.0999999940395355,
+          "sceneAndFrameWaitMs": 0.30000001192092896,
+          "renderAndGpuMs": 1.699999988079071,
+          "nextFrameWaitMs": 5
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 24.19999998807907,
+            "metadataOpenMs": 3.7000000178813934,
+            "queryMs": 410.7999999821186,
+            "colorAndBufferMs": 2.0999999940395355,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 1.699999988079071,
+            "nextFrameWaitMs": 5
+          },
+          {
+            "startupAndDeliveryMs": 24.599999994039536,
+            "metadataOpenMs": 3.7000000178813934,
+            "queryMs": 411.5,
+            "colorAndBufferMs": 2.2999999821186066,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 1.7000000178813934,
+            "nextFrameWaitMs": 3.199999988079071
+          },
+          {
+            "startupAndDeliveryMs": 23.900000005960464,
+            "metadataOpenMs": 3.899999976158142,
+            "queryMs": 409.5,
+            "colorAndBufferMs": 2,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 1.7999999821186066,
+            "nextFrameWaitMs": 6.4000000059604645
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-z",
+      "parquet": {
+        "selectedSampleIndex": 1,
+        "totalMs": 309,
+        "phases": {
+          "startupAndDeliveryMs": 20.5,
+          "metadataOpenMs": 6.600000023841858,
+          "queryMs": 253.5,
+          "colorAndBufferMs": 12.399999976158142,
+          "sceneAndFrameWaitMs": 0.4000000059604645,
+          "renderAndGpuMs": 5.9000000059604645,
+          "nextFrameWaitMs": 9.699999988079071
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 20.600000023841858,
+            "metadataOpenMs": 6.399999976158142,
+            "queryMs": 252.30000001192093,
+            "colorAndBufferMs": 12.400000005960464,
+            "sceneAndFrameWaitMs": 0.29999998211860657,
+            "renderAndGpuMs": 6,
+            "nextFrameWaitMs": 0.10000002384185791
+          },
+          {
+            "startupAndDeliveryMs": 20.5,
+            "metadataOpenMs": 6.600000023841858,
+            "queryMs": 253.5,
+            "colorAndBufferMs": 12.399999976158142,
+            "sceneAndFrameWaitMs": 0.4000000059604645,
+            "renderAndGpuMs": 5.9000000059604645,
+            "nextFrameWaitMs": 9.699999988079071
+          },
+          {
+            "startupAndDeliveryMs": 21,
+            "metadataOpenMs": 7.0999999940395355,
+            "queryMs": 259.30000001192093,
+            "colorAndBufferMs": 12.699999988079071,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 6.200000017881393,
+            "nextFrameWaitMs": 8.399999976158142
+          }
+        ]
+      },
+      "copc": {
+        "selectedSampleIndex": 2,
+        "totalMs": 880.6999999880791,
+        "phases": {
+          "startupAndDeliveryMs": 25.5,
+          "metadataOpenMs": 3.5,
+          "queryMs": 829.7999999821186,
+          "colorAndBufferMs": 11.800000011920929,
+          "sceneAndFrameWaitMs": 0.4000000059604645,
+          "renderAndGpuMs": 6.199999988079071,
+          "nextFrameWaitMs": 3.5
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 25.799999982118607,
+            "metadataOpenMs": 3.2000000178813934,
+            "queryMs": 828.2999999821186,
+            "colorAndBufferMs": 11.5,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 5.9000000059604645,
+            "nextFrameWaitMs": 5.399999976158142
+          },
+          {
+            "startupAndDeliveryMs": 25.099999994039536,
+            "metadataOpenMs": 3.5,
+            "queryMs": 827.6999999880791,
+            "colorAndBufferMs": 11.400000005960464,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 6.0999999940395355,
+            "nextFrameWaitMs": 6.699999988079071
+          },
+          {
+            "startupAndDeliveryMs": 25.5,
+            "metadataOpenMs": 3.5,
+            "queryMs": 829.7999999821186,
+            "colorAndBufferMs": 11.800000011920929,
+            "sceneAndFrameWaitMs": 0.4000000059604645,
+            "renderAndGpuMs": 6.199999988079071,
+            "nextFrameWaitMs": 3.5
+          }
+        ]
+      }
+    },
+    {
+      "name": "large",
+      "parquet": {
+        "selectedSampleIndex": 0,
+        "totalMs": 424.2000000178814,
+        "phases": {
+          "startupAndDeliveryMs": 20.5,
+          "metadataOpenMs": 6.800000011920929,
+          "queryMs": 352.7999999821186,
+          "colorAndBufferMs": 27.400000005960464,
+          "sceneAndFrameWaitMs": 0.30000001192092896,
+          "renderAndGpuMs": 13.5,
+          "nextFrameWaitMs": 2.9000000059604645
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 20.5,
+            "metadataOpenMs": 6.800000011920929,
+            "queryMs": 352.7999999821186,
+            "colorAndBufferMs": 27.400000005960464,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 13.5,
+            "nextFrameWaitMs": 2.9000000059604645
+          },
+          {
+            "startupAndDeliveryMs": 20.700000017881393,
+            "metadataOpenMs": 6.799999982118607,
+            "queryMs": 358.40000000596046,
+            "colorAndBufferMs": 27.5,
+            "sceneAndFrameWaitMs": 0.4000000059604645,
+            "renderAndGpuMs": 13.199999988079071,
+            "nextFrameWaitMs": 0.09999999403953552
+          },
+          {
+            "startupAndDeliveryMs": 19.099999994039536,
+            "metadataOpenMs": 6.199999988079071,
+            "queryMs": 344.2000000178814,
+            "colorAndBufferMs": 27.5,
+            "sceneAndFrameWaitMs": 0.20000001788139343,
+            "renderAndGpuMs": 12.900000005960464,
+            "nextFrameWaitMs": 0.09999999403953552
+          }
+        ]
+      },
+      "copc": {
+        "selectedSampleIndex": 1,
+        "totalMs": 959.5,
+        "phases": {
+          "startupAndDeliveryMs": 25.000000029802322,
+          "metadataOpenMs": 3.800000011920929,
+          "queryMs": 884.8999999761581,
+          "colorAndBufferMs": 32.5,
+          "sceneAndFrameWaitMs": 0.3999999761581421,
+          "renderAndGpuMs": 12.800000011920929,
+          "nextFrameWaitMs": 0.09999999403953552
+        },
+        "samples": [
+          {
+            "startupAndDeliveryMs": 24.299999982118607,
+            "metadataOpenMs": 3.800000011920929,
+            "queryMs": 856.4000000059605,
+            "colorAndBufferMs": 26.19999998807907,
+            "sceneAndFrameWaitMs": 0.19999998807907104,
+            "renderAndGpuMs": 12.600000023841858,
+            "nextFrameWaitMs": 2
+          },
+          {
+            "startupAndDeliveryMs": 25.000000029802322,
+            "metadataOpenMs": 3.800000011920929,
+            "queryMs": 884.8999999761581,
+            "colorAndBufferMs": 32.5,
+            "sceneAndFrameWaitMs": 0.3999999761581421,
+            "renderAndGpuMs": 12.800000011920929,
+            "nextFrameWaitMs": 0.09999999403953552
+          },
+          {
+            "startupAndDeliveryMs": 27.700000017881393,
+            "metadataOpenMs": 3.699999988079071,
+            "queryMs": 892.5,
+            "colorAndBufferMs": 25.799999982118607,
+            "sceneAndFrameWaitMs": 0.30000001192092896,
+            "renderAndGpuMs": 11.900000005960464,
+            "nextFrameWaitMs": 3.899999976158142
+          }
+        ]
+      }
+    }
+  ],
+  "totals": {
+    "parquet": {
+      "totalMs": 1207.1000000238419,
+      "phases": {
+        "startupAndDeliveryMs": 101.7999999821186,
+        "metadataOpenMs": 33.30000004172325,
+        "queryMs": 973.9999999701977,
+        "colorAndBufferMs": 48,
+        "sceneAndFrameWaitMs": 1.5000000298023224,
+        "renderAndGpuMs": 26.200000017881393,
+        "nextFrameWaitMs": 22.299999982118607
+      }
+    },
+    "copc": {
+      "totalMs": 3315.899999946356,
+      "phases": {
+        "startupAndDeliveryMs": 123.7999999821186,
+        "metadataOpenMs": 18.100000023841858,
+        "queryMs": 3071.1999999284744,
+        "colorAndBufferMs": 52.40000003576279,
+        "sceneAndFrameWaitMs": 1.5999999940395355,
+        "renderAndGpuMs": 25.299999982118607,
+        "nextFrameWaitMs": 23.5
+      }
+    }
+  }
+}

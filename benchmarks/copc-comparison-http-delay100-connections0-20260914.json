@@ -1,0 +1,767 @@
+{
+  "benchmark": "point-cloud-parquet-vs-copc",
+  "measuredAt": "2026-09-14T04:02:51.916Z",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.18.0",
+    "cpu": "Apple M5 Pro",
+    "repeats": 3,
+    "warmup": 1,
+    "copcDecoderConcurrency": 4,
+    "parquetRangeCoalescing": {
+      "maxGapBytes": 32768,
+      "maxRequestBytes": 2097152
+    },
+    "transport": {
+      "parquet": "HTTP Range (including HEAD at open)",
+      "copc": "HTTP Range",
+      "httpClient": "node:http(s) Agent; HTTP/1.1, no pipelining, buffered bodies, direct URLs only",
+      "connectionsPerOrigin": null,
+      "cache": "cold reader cache per sample; OS, connection and server caches are not reset"
+    },
+    "loadTiming": "wall time from before reader open through query completion, including metadata and hierarchy reads; includes network waits for HTTP sources; excludes module/decoder startup, discovery, rendering, and OS cache clearing"
+  },
+  "dataset": {
+    "parquet": "114112.parquet",
+    "copc": "114112.copc.laz",
+    "points": 7188755,
+    "parquetBytes": 105183389,
+    "copcBytes": 88839485,
+    "parquetToCopcStorage": 1.183971170026481,
+    "bounds": [
+      -8000,
+      -38100,
+      37.3111,
+      -7600.001,
+      -37800.001000000004,
+      387.3711
+    ],
+    "queryCenter": [
+      -7840.609,
+      -37934.965000000004,
+      55.03210000000001
+    ],
+    "queryCenterSource": "coordinate medians of the COPC root node"
+  },
+  "lod": {
+    "matching": "nearest cumulative global point count to 25% of source points",
+    "parquet": {
+      "maxLevel": 4,
+      "cumulativePoints": 2039852,
+      "geometricError": 0.8868100134752651
+    },
+    "copc": {
+      "maxDepth": 2,
+      "cumulativePoints": 1903684,
+      "nominalSpacing": 0.680270408163265
+    }
+  },
+  "queries": [
+    {
+      "name": "cube",
+      "bounds": [
+        -7890.608875,
+        -37972.464875000005,
+        37.3111,
+        -7790.609125,
+        -37897.465125,
+        124.8261
+      ],
+      "parquet": {
+        "openElapsedMs": 208.5277500000002,
+        "metadataBytesFetched": 524288,
+        "bytesFetched": 4557396,
+        "rangeRequests": 51,
+        "rowGroupsTotal": 34,
+        "rowGroupsRead": 9,
+        "rowGroupsPruned": 25,
+        "pointsInCandidateRowGroups": 1655833,
+        "pointsMatched": 167039,
+        "elapsedMs": 365.01945800000067,
+        "loadElapsedMs": 573.2164160000002,
+        "totalBytesFetched": 5081684
+      },
+      "copc": {
+        "openElapsedMs": 411.3362080000006,
+        "metadataBytesFetched": 76824,
+        "metadataRangeRequests": 4,
+        "bytesFetched": 15041721,
+        "rangeRequests": 9,
+        "nodesTotal": 21,
+        "nodesRead": 9,
+        "nodesPruned": 12,
+        "pointsInCandidateNodes": 1102186,
+        "pointsMatched": 155670,
+        "elapsedMs": 676.3618340000003,
+        "loadElapsedMs": 1088.6565,
+        "totalBytesFetched": 15118545
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 211.59891599999992,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4557396,
+            "rangeRequests": 51,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 167039,
+            "elapsedMs": 367.7016250000006,
+            "loadElapsedMs": 579.5578340000002,
+            "totalBytesFetched": 5081684
+          },
+          {
+            "openElapsedMs": 208.12554199999977,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4557396,
+            "rangeRequests": 51,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 167039,
+            "elapsedMs": 365.01945800000067,
+            "loadElapsedMs": 573.2164160000002,
+            "totalBytesFetched": 5081684
+          },
+          {
+            "openElapsedMs": 208.5277500000002,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4557396,
+            "rangeRequests": 51,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 167039,
+            "elapsedMs": 358.33629199999996,
+            "loadElapsedMs": 566.9355409999998,
+            "totalBytesFetched": 5081684
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 409.89416600000004,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 15041721,
+            "rangeRequests": 9,
+            "nodesTotal": 21,
+            "nodesRead": 9,
+            "nodesPruned": 12,
+            "pointsInCandidateNodes": 1102186,
+            "pointsMatched": 155670,
+            "elapsedMs": 686.8772079999999,
+            "loadElapsedMs": 1097.2461250000001,
+            "totalBytesFetched": 15118545
+          },
+          {
+            "openElapsedMs": 411.57325000000037,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 15041721,
+            "rangeRequests": 9,
+            "nodesTotal": 21,
+            "nodesRead": 9,
+            "nodesPruned": 12,
+            "pointsInCandidateNodes": 1102186,
+            "pointsMatched": 155670,
+            "elapsedMs": 676.3618340000003,
+            "loadElapsedMs": 1088.6565,
+            "totalBytesFetched": 15118545
+          },
+          {
+            "openElapsedMs": 411.3362080000006,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 15041721,
+            "rangeRequests": 9,
+            "nodesTotal": 21,
+            "nodesRead": 9,
+            "nodesPruned": 12,
+            "pointsInCandidateNodes": 1102186,
+            "pointsMatched": 155670,
+            "elapsedMs": 674.9414589999997,
+            "loadElapsedMs": 1086.7609160000002,
+            "totalBytesFetched": 15118545
+          }
+        ]
+      },
+      "comparison": {
+        "parquetToCopcLoadElapsed": 0.5265356115542416,
+        "parquetToCopcTotalBytes": 0.33612255676720215,
+        "parquetToCopcBytes": 0.30298368118914054,
+        "parquetToCopcElapsed": 0.5396807443159197,
+        "parquetBytesPerMatchedPoint": 27.283424828932166,
+        "copcBytesPerMatchedPoint": 96.6256889574099
+      }
+    },
+    {
+      "name": "thin-x",
+      "bounds": [
+        -7848.60898,
+        -38024.964700000004,
+        37.3111,
+        -7832.60902,
+        -37844.9653,
+        247.3471
+      ],
+      "parquet": {
+        "openElapsedMs": 208.15670800000044,
+        "metadataBytesFetched": 524288,
+        "bytesFetched": 2893941,
+        "rangeRequests": 38,
+        "rowGroupsTotal": 34,
+        "rowGroupsRead": 7,
+        "rowGroupsPruned": 27,
+        "pointsInCandidateRowGroups": 1191363,
+        "pointsMatched": 55845,
+        "elapsedMs": 313.09991699999955,
+        "loadElapsedMs": 519.429666,
+        "totalBytesFetched": 3418229
+      },
+      "copc": {
+        "openElapsedMs": 410.08900000000176,
+        "metadataBytesFetched": 76824,
+        "metadataRangeRequests": 4,
+        "bytesFetched": 10500285,
+        "rangeRequests": 7,
+        "nodesTotal": 21,
+        "nodesRead": 7,
+        "nodesPruned": 14,
+        "pointsInCandidateNodes": 773464,
+        "pointsMatched": 52046,
+        "elapsedMs": 511.6265830000011,
+        "loadElapsedMs": 922.9939579999991,
+        "totalBytesFetched": 10577109
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 209.35287499999868,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 2893941,
+            "rangeRequests": 38,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 7,
+            "rowGroupsPruned": 27,
+            "pointsInCandidateRowGroups": 1191363,
+            "pointsMatched": 55845,
+            "elapsedMs": 315.0696250000001,
+            "loadElapsedMs": 524.518,
+            "totalBytesFetched": 3418229
+          },
+          {
+            "openElapsedMs": 206.26695800000016,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 2893941,
+            "rangeRequests": 38,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 7,
+            "rowGroupsPruned": 27,
+            "pointsInCandidateRowGroups": 1191363,
+            "pointsMatched": 55845,
+            "elapsedMs": 313.09991699999955,
+            "loadElapsedMs": 519.429666,
+            "totalBytesFetched": 3418229
+          },
+          {
+            "openElapsedMs": 208.15670800000044,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 2893941,
+            "rangeRequests": 38,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 7,
+            "rowGroupsPruned": 27,
+            "pointsInCandidateRowGroups": 1191363,
+            "pointsMatched": 55845,
+            "elapsedMs": 311.0094169999993,
+            "loadElapsedMs": 519.257708000001,
+            "totalBytesFetched": 3418229
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 410.08900000000176,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 10500285,
+            "rangeRequests": 7,
+            "nodesTotal": 21,
+            "nodesRead": 7,
+            "nodesPruned": 14,
+            "pointsInCandidateNodes": 773464,
+            "pointsMatched": 52046,
+            "elapsedMs": 509.3453329999993,
+            "loadElapsedMs": 919.814875,
+            "totalBytesFetched": 10577109
+          },
+          {
+            "openElapsedMs": 409.61512500000026,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 10500285,
+            "rangeRequests": 7,
+            "nodesTotal": 21,
+            "nodesRead": 7,
+            "nodesPruned": 14,
+            "pointsInCandidateNodes": 773464,
+            "pointsMatched": 52046,
+            "elapsedMs": 513.0805,
+            "loadElapsedMs": 922.9939579999991,
+            "totalBytesFetched": 10577109
+          },
+          {
+            "openElapsedMs": 411.18641599999864,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 10500285,
+            "rangeRequests": 7,
+            "nodesTotal": 21,
+            "nodesRead": 7,
+            "nodesPruned": 14,
+            "pointsInCandidateNodes": 773464,
+            "pointsMatched": 52046,
+            "elapsedMs": 511.6265830000011,
+            "loadElapsedMs": 923.5266670000001,
+            "totalBytesFetched": 10577109
+          }
+        ]
+      },
+      "comparison": {
+        "parquetToCopcLoadElapsed": 0.5627660522562169,
+        "parquetToCopcTotalBytes": 0.32317233376341303,
+        "parquetToCopcBytes": 0.2756059478385587,
+        "parquetToCopcElapsed": 0.6119696032291561,
+        "parquetBytesPerMatchedPoint": 51.82095084609186,
+        "copcBytesPerMatchedPoint": 201.75008646197594
+      }
+    },
+    {
+      "name": "thin-y",
+      "bounds": [
+        -7960.608700000001,
+        -37940.964980000004,
+        37.3111,
+        -7720.609300000001,
+        -37928.96502,
+        247.3471
+      ],
+      "parquet": {
+        "openElapsedMs": 208.02529199999844,
+        "metadataBytesFetched": 524288,
+        "bytesFetched": 4863133,
+        "rangeRequests": 92,
+        "rowGroupsTotal": 34,
+        "rowGroupsRead": 9,
+        "rowGroupsPruned": 25,
+        "pointsInCandidateRowGroups": 1655833,
+        "pointsMatched": 63324,
+        "elapsedMs": 354.44237500000236,
+        "loadElapsedMs": 561.4683750000004,
+        "totalBytesFetched": 5387421
+      },
+      "copc": {
+        "openElapsedMs": 410.83408399999826,
+        "metadataBytesFetched": 76824,
+        "metadataRangeRequests": 4,
+        "bytesFetched": 11088311,
+        "rangeRequests": 6,
+        "nodesTotal": 21,
+        "nodesRead": 6,
+        "nodesPruned": 15,
+        "pointsInCandidateNodes": 811879,
+        "pointsMatched": 58655,
+        "elapsedMs": 531.0925829999996,
+        "loadElapsedMs": 940.0067920000001,
+        "totalBytesFetched": 11165135
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 205.35683400000016,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4863133,
+            "rangeRequests": 92,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 63324,
+            "elapsedMs": 356.02437499999905,
+            "loadElapsedMs": 561.4683750000004,
+            "totalBytesFetched": 5387421
+          },
+          {
+            "openElapsedMs": 208.93920799999978,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4863133,
+            "rangeRequests": 92,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 63324,
+            "elapsedMs": 351.2074169999978,
+            "loadElapsedMs": 560.2699170000014,
+            "totalBytesFetched": 5387421
+          },
+          {
+            "openElapsedMs": 208.02529199999844,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 4863133,
+            "rangeRequests": 92,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 9,
+            "rowGroupsPruned": 25,
+            "pointsInCandidateRowGroups": 1655833,
+            "pointsMatched": 63324,
+            "elapsedMs": 354.44237500000236,
+            "loadElapsedMs": 562.5740000000005,
+            "totalBytesFetched": 5387421
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 411.924708999999,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 11088311,
+            "rangeRequests": 6,
+            "nodesTotal": 21,
+            "nodesRead": 6,
+            "nodesPruned": 15,
+            "pointsInCandidateNodes": 811879,
+            "pointsMatched": 58655,
+            "elapsedMs": 531.0925829999996,
+            "loadElapsedMs": 943.4548749999994,
+            "totalBytesFetched": 11165135
+          },
+          {
+            "openElapsedMs": 407.5642079999998,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 11088311,
+            "rangeRequests": 6,
+            "nodesTotal": 21,
+            "nodesRead": 6,
+            "nodesPruned": 15,
+            "pointsInCandidateNodes": 811879,
+            "pointsMatched": 58655,
+            "elapsedMs": 531.8584589999991,
+            "loadElapsedMs": 940.0067920000001,
+            "totalBytesFetched": 11165135
+          },
+          {
+            "openElapsedMs": 410.83408399999826,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 11088311,
+            "rangeRequests": 6,
+            "nodesTotal": 21,
+            "nodesRead": 6,
+            "nodesPruned": 15,
+            "pointsInCandidateNodes": 811879,
+            "pointsMatched": 58655,
+            "elapsedMs": 521.0708749999976,
+            "loadElapsedMs": 932.3001249999979,
+            "totalBytesFetched": 11165135
+          }
+        ]
+      },
+      "comparison": {
+        "parquetToCopcLoadElapsed": 0.5973024660868623,
+        "parquetToCopcTotalBytes": 0.4825217966464355,
+        "parquetToCopcBytes": 0.43858194453600735,
+        "parquetToCopcElapsed": 0.6673834023398564,
+        "parquetBytesPerMatchedPoint": 76.79762807150527,
+        "copcBytesPerMatchedPoint": 189.04289489387094
+      }
+    },
+    {
+      "name": "thin-z",
+      "bounds": [
+        -7960.608700000001,
+        -38024.964700000004,
+        48.03090000000001,
+        -7720.609300000001,
+        -37844.9653,
+        62.03330000000001
+      ],
+      "parquet": {
+        "openElapsedMs": 207.24620800000048,
+        "metadataBytesFetched": 524288,
+        "bytesFetched": 10626678,
+        "rangeRequests": 66,
+        "rowGroupsTotal": 34,
+        "rowGroupsRead": 11,
+        "rowGroupsPruned": 23,
+        "pointsInCandidateRowGroups": 2039852,
+        "pointsMatched": 505788,
+        "elapsedMs": 487.0594579999997,
+        "loadElapsedMs": 694.2813339999993,
+        "totalBytesFetched": 11150966
+      },
+      "copc": {
+        "openElapsedMs": 409.94816699999865,
+        "metadataBytesFetched": 76824,
+        "metadataRangeRequests": 4,
+        "bytesFetched": 22021093,
+        "rangeRequests": 14,
+        "nodesTotal": 21,
+        "nodesRead": 14,
+        "nodesPruned": 7,
+        "pointsInCandidateNodes": 1629315,
+        "pointsMatched": 471138,
+        "elapsedMs": 969.7966669999987,
+        "loadElapsedMs": 1379.828834,
+        "totalBytesFetched": 22097917
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 207.24620800000048,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 10626678,
+            "rangeRequests": 66,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 505788,
+            "elapsedMs": 483.98525000000154,
+            "loadElapsedMs": 691.299874999997,
+            "totalBytesFetched": 11150966
+          },
+          {
+            "openElapsedMs": 208.1765000000014,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 10626678,
+            "rangeRequests": 66,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 505788,
+            "elapsedMs": 501.9560410000013,
+            "loadElapsedMs": 710.1912499999999,
+            "totalBytesFetched": 11150966
+          },
+          {
+            "openElapsedMs": 207.18004199999996,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 10626678,
+            "rangeRequests": 66,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 505788,
+            "elapsedMs": 487.0594579999997,
+            "loadElapsedMs": 694.2813339999993,
+            "totalBytesFetched": 11150966
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 410.11166700000103,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22021093,
+            "rangeRequests": 14,
+            "nodesTotal": 21,
+            "nodesRead": 14,
+            "nodesPruned": 7,
+            "pointsInCandidateNodes": 1629315,
+            "pointsMatched": 471138,
+            "elapsedMs": 954.2499160000007,
+            "loadElapsedMs": 1364.9234590000015,
+            "totalBytesFetched": 22097917
+          },
+          {
+            "openElapsedMs": 409.94816699999865,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22021093,
+            "rangeRequests": 14,
+            "nodesTotal": 21,
+            "nodesRead": 14,
+            "nodesPruned": 7,
+            "pointsInCandidateNodes": 1629315,
+            "pointsMatched": 471138,
+            "elapsedMs": 976.1887910000005,
+            "loadElapsedMs": 1386.7405840000029,
+            "totalBytesFetched": 22097917
+          },
+          {
+            "openElapsedMs": 409.37820900000224,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22021093,
+            "rangeRequests": 14,
+            "nodesTotal": 21,
+            "nodesRead": 14,
+            "nodesPruned": 7,
+            "pointsInCandidateNodes": 1629315,
+            "pointsMatched": 471138,
+            "elapsedMs": 969.7966669999987,
+            "loadElapsedMs": 1379.828834,
+            "totalBytesFetched": 22097917
+          }
+        ]
+      },
+      "comparison": {
+        "parquetToCopcLoadElapsed": 0.5031648251525083,
+        "parquetToCopcTotalBytes": 0.5046161590705586,
+        "parquetToCopcBytes": 0.48256814500533646,
+        "parquetToCopcElapsed": 0.5022284305293455,
+        "parquetBytesPerMatchedPoint": 21.010142589385275,
+        "copcBytesPerMatchedPoint": 46.74021836489521
+      }
+    },
+    {
+      "name": "large",
+      "bounds": [
+        -7980.60865,
+        -38039.96465,
+        37.3111,
+        -7700.609350000001,
+        -37829.965350000006,
+        387.3711
+      ],
+      "parquet": {
+        "openElapsedMs": 209.73620899999878,
+        "metadataBytesFetched": 524288,
+        "bytesFetched": 12589860,
+        "rangeRequests": 36,
+        "rowGroupsTotal": 34,
+        "rowGroupsRead": 11,
+        "rowGroupsPruned": 23,
+        "pointsInCandidateRowGroups": 2039852,
+        "pointsMatched": 1156132,
+        "elapsedMs": 604.0201670000024,
+        "loadElapsedMs": 812.3943330000038,
+        "totalBytesFetched": 13114148
+      },
+      "copc": {
+        "openElapsedMs": 410.3137080000015,
+        "metadataBytesFetched": 76824,
+        "metadataRangeRequests": 4,
+        "bytesFetched": 22397825,
+        "rangeRequests": 18,
+        "nodesTotal": 21,
+        "nodesRead": 18,
+        "nodesPruned": 3,
+        "pointsInCandidateNodes": 1655651,
+        "pointsMatched": 1075981,
+        "elapsedMs": 1020.9151249999995,
+        "loadElapsedMs": 1432.4813339999964,
+        "totalBytesFetched": 22474649
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 209.73620899999878,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 12589860,
+            "rangeRequests": 36,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 1156132,
+            "elapsedMs": 602.3843750000015,
+            "loadElapsedMs": 812.1897080000017,
+            "totalBytesFetched": 13114148
+          },
+          {
+            "openElapsedMs": 208.32587499999863,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 12589860,
+            "rangeRequests": 36,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 1156132,
+            "elapsedMs": 604.0201670000024,
+            "loadElapsedMs": 812.3943330000038,
+            "totalBytesFetched": 13114148
+          },
+          {
+            "openElapsedMs": 210.06933299999946,
+            "metadataBytesFetched": 524288,
+            "bytesFetched": 12589860,
+            "rangeRequests": 36,
+            "rowGroupsTotal": 34,
+            "rowGroupsRead": 11,
+            "rowGroupsPruned": 23,
+            "pointsInCandidateRowGroups": 2039852,
+            "pointsMatched": 1156132,
+            "elapsedMs": 609.5500000000029,
+            "loadElapsedMs": 819.6890829999975,
+            "totalBytesFetched": 13114148
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 410.0975839999992,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22397825,
+            "rangeRequests": 18,
+            "nodesTotal": 21,
+            "nodesRead": 18,
+            "nodesPruned": 3,
+            "pointsInCandidateNodes": 1655651,
+            "pointsMatched": 1075981,
+            "elapsedMs": 1034.885875,
+            "loadElapsedMs": 1445.5247079999972,
+            "totalBytesFetched": 22474649
+          },
+          {
+            "openElapsedMs": 410.3137080000015,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22397825,
+            "rangeRequests": 18,
+            "nodesTotal": 21,
+            "nodesRead": 18,
+            "nodesPruned": 3,
+            "pointsInCandidateNodes": 1655651,
+            "pointsMatched": 1075981,
+            "elapsedMs": 1020.9151249999995,
+            "loadElapsedMs": 1431.8322079999998,
+            "totalBytesFetched": 22474649
+          },
+          {
+            "openElapsedMs": 414.33233299999847,
+            "metadataBytesFetched": 76824,
+            "metadataRangeRequests": 4,
+            "bytesFetched": 22397825,
+            "rangeRequests": 18,
+            "nodesTotal": 21,
+            "nodesRead": 18,
+            "nodesPruned": 3,
+            "pointsInCandidateNodes": 1655651,
+            "pointsMatched": 1075981,
+            "elapsedMs": 1017.6344160000008,
+            "loadElapsedMs": 1432.4813339999964,
+            "totalBytesFetched": 22474649
+          }
+        ]
+      },
+      "comparison": {
+        "parquetToCopcLoadElapsed": 0.5671238526588758,
+        "parquetToCopcTotalBytes": 0.5835084676962029,
+        "parquetToCopcBytes": 0.5621019005193585,
+        "parquetToCopcElapsed": 0.5916458207042458,
+        "parquetBytesPerMatchedPoint": 10.889638899364433,
+        "copcBytesPerMatchedPoint": 20.81619006283568
+      }
+    }
+  ]
+}

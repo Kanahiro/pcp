@@ -1,0 +1,616 @@
+{
+  "benchmark": "browser-memory-open-through-xyzrgb",
+  "measuredAt": "2026-09-14T04:12:19.570Z",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "hardwareConcurrency": 15,
+    "context": "dedicated Worker",
+    "repeats": 5,
+    "warmup": 1,
+    "lazPerfInstances": 4,
+    "transport": "preloaded ArrayBuffers; copies per Range, no network inside timer",
+    "exclusions": "input preload, module/decoder startup, GPU upload, rendering; not CPU-only (includes copies and allocations)"
+  },
+  "dataset": {
+    "parquet": "114112.parquet",
+    "copc": "114112.copc.laz",
+    "points": 7188755,
+    "parquetBytes": 105183389,
+    "copcBytes": 88839485,
+    "parquetToCopcStorage": 1.183971170026481,
+    "bounds": [
+      -8000,
+      -38100,
+      37.3111,
+      -7600.001,
+      -37800.001000000004,
+      387.3711
+    ],
+    "queryCenter": [
+      -7840.609,
+      -37934.965000000004,
+      55.03210000000001
+    ],
+    "queryCenterSource": "coordinate medians of the COPC root node"
+  },
+  "lod": {
+    "matching": "nearest cumulative global point count to 25% of source points",
+    "parquet": {
+      "maxLevel": 4,
+      "cumulativePoints": 2039852,
+      "geometricError": 0.8868100134752651
+    },
+    "copc": {
+      "maxDepth": 2,
+      "cumulativePoints": 1903684,
+      "nominalSpacing": 0.680270408163265
+    }
+  },
+  "queries": [
+    {
+      "name": "cube",
+      "bounds": [
+        -7890.608875,
+        -37972.464875000005,
+        37.3111,
+        -7790.609125,
+        -37897.465125,
+        124.8261
+      ],
+      "parquet": {
+        "openElapsedMs": 3.0999999940395355,
+        "loadElapsedMs": 104.59999999403954,
+        "pointsMatched": 167039,
+        "bytesRead": 5081684,
+        "ranges": 52,
+        "outputBytes": 3006702
+      },
+      "copc": {
+        "openElapsedMs": 0.29999998211860657,
+        "loadElapsedMs": 532.6999999880791,
+        "pointsMatched": 155670,
+        "bytesRead": 15118545,
+        "ranges": 13,
+        "outputBytes": 2802060
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 3.2000000178813934,
+            "loadElapsedMs": 116.7000000178814,
+            "pointsMatched": 167039,
+            "bytesRead": 5081684,
+            "ranges": 52,
+            "outputBytes": 3006702
+          },
+          {
+            "openElapsedMs": 3.0999999940395355,
+            "loadElapsedMs": 104.59999999403954,
+            "pointsMatched": 167039,
+            "bytesRead": 5081684,
+            "ranges": 52,
+            "outputBytes": 3006702
+          },
+          {
+            "openElapsedMs": 3.100000023841858,
+            "loadElapsedMs": 105.7000000178814,
+            "pointsMatched": 167039,
+            "bytesRead": 5081684,
+            "ranges": 52,
+            "outputBytes": 3006702
+          },
+          {
+            "openElapsedMs": 3.0999999940395355,
+            "loadElapsedMs": 104.2999999821186,
+            "pointsMatched": 167039,
+            "bytesRead": 5081684,
+            "ranges": 52,
+            "outputBytes": 3006702
+          },
+          {
+            "openElapsedMs": 2.9000000059604645,
+            "loadElapsedMs": 103.09999999403954,
+            "pointsMatched": 167039,
+            "bytesRead": 5081684,
+            "ranges": 52,
+            "outputBytes": 3006702
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 0.29999998211860657,
+            "loadElapsedMs": 541.6999999880791,
+            "pointsMatched": 155670,
+            "bytesRead": 15118545,
+            "ranges": 13,
+            "outputBytes": 2802060
+          },
+          {
+            "openElapsedMs": 0.30000001192092896,
+            "loadElapsedMs": 535.1999999880791,
+            "pointsMatched": 155670,
+            "bytesRead": 15118545,
+            "ranges": 13,
+            "outputBytes": 2802060
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 528.5999999940395,
+            "pointsMatched": 155670,
+            "bytesRead": 15118545,
+            "ranges": 13,
+            "outputBytes": 2802060
+          },
+          {
+            "openElapsedMs": 0.29999998211860657,
+            "loadElapsedMs": 532.6999999880791,
+            "pointsMatched": 155670,
+            "bytesRead": 15118545,
+            "ranges": 13,
+            "outputBytes": 2802060
+          },
+          {
+            "openElapsedMs": 0.09999999403953552,
+            "loadElapsedMs": 530.2999999821186,
+            "pointsMatched": 155670,
+            "bytesRead": 15118545,
+            "ranges": 13,
+            "outputBytes": 2802060
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-x",
+      "bounds": [
+        -7848.60898,
+        -38024.964700000004,
+        37.3111,
+        -7832.60902,
+        -37844.9653,
+        247.3471
+      ],
+      "parquet": {
+        "openElapsedMs": 2.0999999940395355,
+        "loadElapsedMs": 67.5,
+        "pointsMatched": 55845,
+        "bytesRead": 3418229,
+        "ranges": 39,
+        "outputBytes": 1005210
+      },
+      "copc": {
+        "openElapsedMs": 0.20000001788139343,
+        "loadElapsedMs": 374,
+        "pointsMatched": 52046,
+        "bytesRead": 10577109,
+        "ranges": 11,
+        "outputBytes": 936828
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 2,
+            "loadElapsedMs": 67.2999999821186,
+            "pointsMatched": 55845,
+            "bytesRead": 3418229,
+            "ranges": 39,
+            "outputBytes": 1005210
+          },
+          {
+            "openElapsedMs": 2.9000000059604645,
+            "loadElapsedMs": 68.59999999403954,
+            "pointsMatched": 55845,
+            "bytesRead": 3418229,
+            "ranges": 39,
+            "outputBytes": 1005210
+          },
+          {
+            "openElapsedMs": 1.9000000059604645,
+            "loadElapsedMs": 67.40000000596046,
+            "pointsMatched": 55845,
+            "bytesRead": 3418229,
+            "ranges": 39,
+            "outputBytes": 1005210
+          },
+          {
+            "openElapsedMs": 3.0999999940395355,
+            "loadElapsedMs": 68.30000001192093,
+            "pointsMatched": 55845,
+            "bytesRead": 3418229,
+            "ranges": 39,
+            "outputBytes": 1005210
+          },
+          {
+            "openElapsedMs": 2.0999999940395355,
+            "loadElapsedMs": 67.5,
+            "pointsMatched": 55845,
+            "bytesRead": 3418229,
+            "ranges": 39,
+            "outputBytes": 1005210
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 371.90000000596046,
+            "pointsMatched": 52046,
+            "bytesRead": 10577109,
+            "ranges": 11,
+            "outputBytes": 936828
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 373.30000001192093,
+            "pointsMatched": 52046,
+            "bytesRead": 10577109,
+            "ranges": 11,
+            "outputBytes": 936828
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 374,
+            "pointsMatched": 52046,
+            "bytesRead": 10577109,
+            "ranges": 11,
+            "outputBytes": 936828
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 374.19999998807907,
+            "pointsMatched": 52046,
+            "bytesRead": 10577109,
+            "ranges": 11,
+            "outputBytes": 936828
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 378.7000000178814,
+            "pointsMatched": 52046,
+            "bytesRead": 10577109,
+            "ranges": 11,
+            "outputBytes": 936828
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-y",
+      "bounds": [
+        -7960.608700000001,
+        -37940.964980000004,
+        37.3111,
+        -7720.609300000001,
+        -37928.96502,
+        247.3471
+      ],
+      "parquet": {
+        "openElapsedMs": 2.899999976158142,
+        "loadElapsedMs": 101.09999999403954,
+        "pointsMatched": 63324,
+        "bytesRead": 5387421,
+        "ranges": 93,
+        "outputBytes": 1139832
+      },
+      "copc": {
+        "openElapsedMs": 0.20000001788139343,
+        "loadElapsedMs": 391.09999999403954,
+        "pointsMatched": 58655,
+        "bytesRead": 11165135,
+        "ranges": 10,
+        "outputBytes": 1055790
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 2.800000011920929,
+            "loadElapsedMs": 101.59999999403954,
+            "pointsMatched": 63324,
+            "bytesRead": 5387421,
+            "ranges": 93,
+            "outputBytes": 1139832
+          },
+          {
+            "openElapsedMs": 3,
+            "loadElapsedMs": 101.09999999403954,
+            "pointsMatched": 63324,
+            "bytesRead": 5387421,
+            "ranges": 93,
+            "outputBytes": 1139832
+          },
+          {
+            "openElapsedMs": 2.899999976158142,
+            "loadElapsedMs": 101,
+            "pointsMatched": 63324,
+            "bytesRead": 5387421,
+            "ranges": 93,
+            "outputBytes": 1139832
+          },
+          {
+            "openElapsedMs": 2.899999976158142,
+            "loadElapsedMs": 100.69999998807907,
+            "pointsMatched": 63324,
+            "bytesRead": 5387421,
+            "ranges": 93,
+            "outputBytes": 1139832
+          },
+          {
+            "openElapsedMs": 2.9000000059604645,
+            "loadElapsedMs": 101.2000000178814,
+            "pointsMatched": 63324,
+            "bytesRead": 5387421,
+            "ranges": 93,
+            "outputBytes": 1139832
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 390.30000001192093,
+            "pointsMatched": 58655,
+            "bytesRead": 11165135,
+            "ranges": 10,
+            "outputBytes": 1055790
+          },
+          {
+            "openElapsedMs": 0.30000001192092896,
+            "loadElapsedMs": 398.10000002384186,
+            "pointsMatched": 58655,
+            "bytesRead": 11165135,
+            "ranges": 10,
+            "outputBytes": 1055790
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 389.7000000178814,
+            "pointsMatched": 58655,
+            "bytesRead": 11165135,
+            "ranges": 10,
+            "outputBytes": 1055790
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 393.69999998807907,
+            "pointsMatched": 58655,
+            "bytesRead": 11165135,
+            "ranges": 10,
+            "outputBytes": 1055790
+          },
+          {
+            "openElapsedMs": 0.30000001192092896,
+            "loadElapsedMs": 391.09999999403954,
+            "pointsMatched": 58655,
+            "bytesRead": 11165135,
+            "ranges": 10,
+            "outputBytes": 1055790
+          }
+        ]
+      }
+    },
+    {
+      "name": "thin-z",
+      "bounds": [
+        -7960.608700000001,
+        -38024.964700000004,
+        48.03090000000001,
+        -7720.609300000001,
+        -37844.9653,
+        62.03330000000001
+      ],
+      "parquet": {
+        "openElapsedMs": 2.0999999940395355,
+        "loadElapsedMs": 213.09999999403954,
+        "pointsMatched": 505788,
+        "bytesRead": 11150966,
+        "ranges": 67,
+        "outputBytes": 9104184
+      },
+      "copc": {
+        "openElapsedMs": 0.19999998807907104,
+        "loadElapsedMs": 791.9000000059605,
+        "pointsMatched": 471138,
+        "bytesRead": 22097917,
+        "ranges": 18,
+        "outputBytes": 8480484
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 2,
+            "loadElapsedMs": 213.09999999403954,
+            "pointsMatched": 505788,
+            "bytesRead": 11150966,
+            "ranges": 67,
+            "outputBytes": 9104184
+          },
+          {
+            "openElapsedMs": 3.0999999940395355,
+            "loadElapsedMs": 214.39999997615814,
+            "pointsMatched": 505788,
+            "bytesRead": 11150966,
+            "ranges": 67,
+            "outputBytes": 9104184
+          },
+          {
+            "openElapsedMs": 2.0999999940395355,
+            "loadElapsedMs": 212.59999999403954,
+            "pointsMatched": 505788,
+            "bytesRead": 11150966,
+            "ranges": 67,
+            "outputBytes": 9104184
+          },
+          {
+            "openElapsedMs": 2.899999976158142,
+            "loadElapsedMs": 212.7999999821186,
+            "pointsMatched": 505788,
+            "bytesRead": 11150966,
+            "ranges": 67,
+            "outputBytes": 9104184
+          },
+          {
+            "openElapsedMs": 2,
+            "loadElapsedMs": 214.59999999403954,
+            "pointsMatched": 505788,
+            "bytesRead": 11150966,
+            "ranges": 67,
+            "outputBytes": 9104184
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 794.6000000238419,
+            "pointsMatched": 471138,
+            "bytesRead": 22097917,
+            "ranges": 18,
+            "outputBytes": 8480484
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 799.8000000119209,
+            "pointsMatched": 471138,
+            "bytesRead": 22097917,
+            "ranges": 18,
+            "outputBytes": 8480484
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 791.9000000059605,
+            "pointsMatched": 471138,
+            "bytesRead": 22097917,
+            "ranges": 18,
+            "outputBytes": 8480484
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 791.4000000059605,
+            "pointsMatched": 471138,
+            "bytesRead": 22097917,
+            "ranges": 18,
+            "outputBytes": 8480484
+          },
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 784.0999999940395,
+            "pointsMatched": 471138,
+            "bytesRead": 22097917,
+            "ranges": 18,
+            "outputBytes": 8480484
+          }
+        ]
+      }
+    },
+    {
+      "name": "large",
+      "bounds": [
+        -7980.60865,
+        -38039.96465,
+        37.3111,
+        -7700.609350000001,
+        -37829.965350000006,
+        387.3711
+      ],
+      "parquet": {
+        "openElapsedMs": 1.9000000059604645,
+        "loadElapsedMs": 315.69999998807907,
+        "pointsMatched": 1156132,
+        "bytesRead": 13114148,
+        "ranges": 37,
+        "outputBytes": 20810376
+      },
+      "copc": {
+        "openElapsedMs": 0.20000001788139343,
+        "loadElapsedMs": 816.5999999940395,
+        "pointsMatched": 1075981,
+        "bytesRead": 22474649,
+        "ranges": 22,
+        "outputBytes": 19367658
+      },
+      "samples": {
+        "parquet": [
+          {
+            "openElapsedMs": 1.9000000059604645,
+            "loadElapsedMs": 327.2000000178814,
+            "pointsMatched": 1156132,
+            "bytesRead": 13114148,
+            "ranges": 37,
+            "outputBytes": 20810376
+          },
+          {
+            "openElapsedMs": 1.7999999821186066,
+            "loadElapsedMs": 311,
+            "pointsMatched": 1156132,
+            "bytesRead": 13114148,
+            "ranges": 37,
+            "outputBytes": 20810376
+          },
+          {
+            "openElapsedMs": 2,
+            "loadElapsedMs": 318.80000001192093,
+            "pointsMatched": 1156132,
+            "bytesRead": 13114148,
+            "ranges": 37,
+            "outputBytes": 20810376
+          },
+          {
+            "openElapsedMs": 1.9000000059604645,
+            "loadElapsedMs": 315.69999998807907,
+            "pointsMatched": 1156132,
+            "bytesRead": 13114148,
+            "ranges": 37,
+            "outputBytes": 20810376
+          },
+          {
+            "openElapsedMs": 1.9000000059604645,
+            "loadElapsedMs": 312.90000000596046,
+            "pointsMatched": 1156132,
+            "bytesRead": 13114148,
+            "ranges": 37,
+            "outputBytes": 20810376
+          }
+        ],
+        "copc": [
+          {
+            "openElapsedMs": 0.19999998807907104,
+            "loadElapsedMs": 821.1999999880791,
+            "pointsMatched": 1075981,
+            "bytesRead": 22474649,
+            "ranges": 22,
+            "outputBytes": 19367658
+          },
+          {
+            "openElapsedMs": 0.30000001192092896,
+            "loadElapsedMs": 818.4000000059605,
+            "pointsMatched": 1075981,
+            "bytesRead": 22474649,
+            "ranges": 22,
+            "outputBytes": 19367658
+          },
+          {
+            "openElapsedMs": 0.30000001192092896,
+            "loadElapsedMs": 815.5,
+            "pointsMatched": 1075981,
+            "bytesRead": 22474649,
+            "ranges": 22,
+            "outputBytes": 19367658
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 816.5999999940395,
+            "pointsMatched": 1075981,
+            "bytesRead": 22474649,
+            "ranges": 22,
+            "outputBytes": 19367658
+          },
+          {
+            "openElapsedMs": 0.20000001788139343,
+            "loadElapsedMs": 814.4000000059605,
+            "pointsMatched": 1075981,
+            "bytesRead": 22474649,
+            "ranges": 22,
+            "outputBytes": 19367658
+          }
+        ]
+      }
+    }
+  ]
+}
