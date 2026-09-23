@@ -8,3 +8,8 @@ allowBuilds:
 
 # pnpm expresses this supply-chain cooling period in minutes: 7 days.
 minimumReleaseAge: 10080
+
+# Backport of hyparquet#180 (faster INT32 DELTA_BINARY_PACKED decoding), unreleased as of 1.31.1.
+# Drop this patch once a release containing it passes minimumReleaseAge.
+patchedDependencies:
+  hyparquet@1.29.2: patches/hyparquet@1.29.2.patch
