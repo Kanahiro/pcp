@@ -105,6 +105,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  hyparquet@1.29.2: 79ab973f0d98ee073e920ee84ff242928a68754bc3063a27269f0a6609c0ef9a
+
 importers:
 
   .:
@@ -139,7 +142,7 @@ importers:
     dependencies:
       hyparquet:
         specifier: 1.29.2
-        version: 1.29.2
+        version: 1.29.2(patch_hash=79ab973f0d98ee073e920ee84ff242928a68754bc3063a27269f0a6609c0ef9a)
       hyparquet-compressors:
         specifier: 1.1.1
         version: 1.1.1
@@ -1376,7 +1379,7 @@ snapshots:
       fzstd: 0.1.1
       hysnappy: 1.0.0
 
-  hyparquet@1.29.2: {}
+  hyparquet@1.29.2(patch_hash=79ab973f0d98ee073e920ee84ff242928a68754bc3063a27269f0a6609c0ef9a): {}
 
   hysnappy@1.0.0: {}
 
