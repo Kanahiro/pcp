@@ -41,7 +41,9 @@ struct Args {
     #[arg(long, value_enum, default_value_t = PageOrderArg::Spatial)]
     page_order: PageOrderArg,
     /// Parquet encoding used for the intensity column.
-    #[arg(long, value_enum, default_value_t = IntensityEncodingArg::Delta)]
+    // Dictionary reduced bytes and Hyparquet decode time for the representative
+    // flight under the current spatial layout; keep alternatives for comparison.
+    #[arg(long, value_enum, default_value_t = IntensityEncodingArg::Dictionary)]
     intensity_encoding: IntensityEncodingArg,
     /// ZSTD compression level accepted by parquet-rs (-7 through 22).
     #[arg(long, default_value_t = 9)]
@@ -103,6 +105,15 @@ struct Summary {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    // The writer creates its output in place. Refuse an input path here so a
+    // mistaken --output cannot replace the source LAS/LAZ after it is read.
+    if let Ok(output) = std::fs::canonicalize(&args.output) {
+        for input in &args.inputs {
+            if std::fs::canonicalize(input).ok().as_ref() == Some(&output) {
+                bail!("output {} is also an input file", args.output.display());
+            }
+        }
+    }
     if args.row_group_size == 0 {
         bail!("--row-group-size must be greater than zero");
     }

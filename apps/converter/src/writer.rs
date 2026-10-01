@@ -116,9 +116,11 @@ pub fn write_parquet(
             .set_column_encoding(intensity, Encoding::PLAIN),
     };
     let gps_time = ColumnPath::from("gps_time");
+    // Spatial ordering does not order timestamps. On the representative flight,
+    // PLAIN + ZSTD reduced GPS bytes and decoded faster than BYTE_STREAM_SPLIT.
     properties = properties
         .set_column_dictionary_enabled(gps_time.clone(), false)
-        .set_column_encoding(gps_time, Encoding::BYTE_STREAM_SPLIT);
+        .set_column_encoding(gps_time, Encoding::PLAIN);
     let properties = properties.build();
 
     let file = File::create(path)

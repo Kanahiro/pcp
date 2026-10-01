@@ -1,7 +1,7 @@
 import { Las } from 'copc';
 const wasmUrl = __BENCHMARK_WASM_URL__;
 import { memorySource, runParquet, runCopc } from './readers.js';
-import reference from '../../benchmarks/copc-comparison-load-20260914.json';
+import reference from './reference.json';
 import { aggregate } from '../benchmark-common.mjs';
 
 self.onmessage = async ({ data: environment }) => {

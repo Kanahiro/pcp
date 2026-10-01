@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { createReadStream, readFileSync, statSync } from "node:fs";
+import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { createSecureServer } from "node:http2";
 import { setTimeout } from "node:timers/promises";
 import { extname, resolve, sep } from "node:path";
 
-const root = resolve(process.argv[2] ?? ".");
+const root = realpathSync(resolve(process.argv[2] ?? "."));
 const port = Number(process.argv[3] ?? "8080");
 const host = "127.0.0.1";
 // Fixed response delay models request latency, not bandwidth or packet-level RTT.
@@ -26,9 +26,14 @@ server.on("request", async (request, response) => {
   try {
     if (delayMs > 0) await setTimeout(delayMs);
     const pathname = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
-    const path = resolve(root, `.${pathname}`);
-    if (path !== root && !path.startsWith(`${root}${sep}`)) throw new Error("path escapes root");
-    const size = statSync(path).size;
+    // Benchmarks also serve their HTML/JS from this root. Block hidden files
+    // and symlink escapes so a browser cannot read local configuration files.
+    if (pathname.split("/").some((part) => part.startsWith("."))) throw new Error("hidden path");
+    const path = realpathSync(resolve(root, `.${pathname}`));
+    if (!path.startsWith(`${root}${sep}`)) throw new Error("path escapes root");
+    const file = statSync(path);
+    if (!file.isFile()) throw new Error("not a file");
+    const size = file.size;
     response.setHeader("Accept-Ranges", "bytes");
     response.setHeader("Timing-Allow-Origin", "*");
     response.setHeader("X-Benchmark-Response-Delay-Ms", String(delayMs));
@@ -48,7 +53,7 @@ server.on("request", async (request, response) => {
     const match = request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
     if (!match) {
       response.writeHead(200, { "Content-Length": size });
-      createReadStream(path).pipe(response);
+      createReadStream(path).on("error", () => response.destroy()).pipe(response);
       return;
     }
     const start = Number(match[1]);
@@ -61,7 +66,7 @@ server.on("request", async (request, response) => {
       "Content-Length": end - start + 1,
       "Content-Range": `bytes ${start}-${end}/${size}`,
     });
-    createReadStream(path, { start, end }).pipe(response);
+    createReadStream(path, { start, end }).on("error", () => response.destroy()).pipe(response);
   } catch {
     response.writeHead(404).end("not found\n");
   }

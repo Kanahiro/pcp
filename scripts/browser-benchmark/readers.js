@@ -1,6 +1,6 @@
 import { Copc } from 'copc';
 import { PointCloudParquet } from '../../packages/browser/dist/index.js';
-import reference from '../../benchmarks/copc-comparison-load-20260914.json';
+import reference from './reference.json';
 import { loadHierarchy, selectCopcNodes, mapPool } from '../benchmark-common.mjs';
 
 // Every source access copies its requested bytes, as a received Range body does.
@@ -68,4 +68,3 @@ export async function runCopc(source, query, decoders) {
     bytesRead: source.metrics.bytesRead, ranges: source.metrics.ranges,
     outputBytes: chunks.reduce((n,c)=>n+c.reduce((m,col)=>m+col.byteLength,0),0) };
 }
-

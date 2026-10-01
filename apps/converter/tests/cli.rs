@@ -11,6 +11,7 @@ use las::{
 };
 use parquet::{
     arrow::arrow_reader::ParquetRecordBatchReaderBuilder,
+    basic::Encoding,
     file::reader::{FileReader, SerializedFileReader},
 };
 
@@ -36,6 +37,25 @@ fn write_simple_las(path: &std::path::Path, start: u16, count: u16) {
             .unwrap();
     }
     writer.close().unwrap();
+}
+
+#[test]
+fn refuses_to_replace_an_input_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let input = directory.path().join("source.las");
+    write_simple_las(&input, 1, 3);
+    let before = std::fs::read(&input).unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pcp-convert"))
+        .arg(&input)
+        .arg("--output")
+        .arg(&input)
+        .output()
+        .unwrap();
+
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("is also an input file"));
+    assert_eq!(before, std::fs::read(&input).unwrap());
 }
 
 #[test]
@@ -176,6 +196,8 @@ fn converts_las_to_prunable_parquet() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
+    let summary: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!("dictionary", summary["intensity_encoding"]);
 
     let reader = SerializedFileReader::new(File::open(output).unwrap()).unwrap();
     let metadata = reader.metadata();
@@ -190,6 +212,21 @@ fn converts_las_to_prunable_parquet() {
         .map(|column| column.name())
         .collect();
     assert_eq!(&column_names[..6], &["x", "y", "z", "red", "green", "blue"]);
+    let column_encoding = |name: &str, expected: Encoding| {
+        let index = column_names
+            .iter()
+            .position(|column| *column == name)
+            .unwrap();
+        assert!(
+            metadata
+                .row_group(0)
+                .column(index)
+                .encodings()
+                .any(|encoding| encoding == expected)
+        );
+    };
+    column_encoding("intensity", Encoding::RLE_DICTIONARY);
+    column_encoding("gps_time", Encoding::PLAIN);
     assert!(
         metadata
             .file_metadata()

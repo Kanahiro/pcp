@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { QuantizedPointMaterial } from '../../apps/viewer/src/point-material.ts';
 import { aggregate } from '../benchmark-common.mjs';
-import reference from '../../benchmarks/copc-comparison-load-20260914.json';
+import reference from './reference.json';
 
 const frame = () => new Promise(resolve=>requestAnimationFrame(resolve));
 const status = document.querySelector('#status');
