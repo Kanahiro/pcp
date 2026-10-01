@@ -34,20 +34,22 @@ const { chunks, metrics } = await cloud.queryWorld(
 
 Each row is one point. The converter preserves LAS quantized XYZ, assigns each point to exactly one LOD level, and stores levels in order. Reading L0 through level *r* adds detail; reading through the final level recovers every point. Within each level, 3D STR packing groups nearby points into Row Groups, then into pages. XYZ min/max statistics and the Page Index let the reader skip candidates outside a 3D bounding box. There is no separate spatial index or octree.
 
-| Columns | Type | Nullable |
-| --- | --- | --- |
-| `x`, `y`, `z` | Int32 | No |
-| `red`, `green`, `blue`, `nir` | UInt16 | Yes |
-| `intensity`, `point_source_id` | UInt16 | No |
-| `return_number`, `number_of_returns`, `classification`, `scanner_channel`, `user_data` | UInt8 | No |
-| `scan_direction_flag`, `edge_of_flight_line`, `synthetic`, `key_point`, `withheld`, `overlap` | Boolean | No |
-| `scan_angle` (degrees) | Float32 | No |
-| `gps_time` | Float64 | Yes |
-| `wave_packet_descriptor_index` | UInt8 | Yes |
-| `waveform_data_offset` | UInt64 | Yes |
-| `waveform_packet_size` | UInt32 | Yes |
-| `return_point_waveform_location`, `waveform_x_t`, `waveform_y_t`, `waveform_z_t` | Float32 | Yes |
-| `extra_bytes` | Binary | Yes |
+| Columns | Type | Nullable | Default value encoding |
+| --- | --- | --- | --- |
+| `x`, `y`, `z` | Int32 | No | `DELTA_BINARY_PACKED` |
+| `red`, `green`, `blue`, `nir` | UInt16 | Yes | Dictionary |
+| `intensity`, `point_source_id` | UInt16 | No | Dictionary |
+| `return_number`, `number_of_returns`, `classification`, `scanner_channel`, `user_data` | UInt8 | No | Dictionary |
+| `scan_direction_flag`, `edge_of_flight_line`, `synthetic`, `key_point`, `withheld`, `overlap` | Boolean | No | `RLE` |
+| `scan_angle` (degrees) | Float32 | No | Dictionary |
+| `gps_time` | Float64 | Yes | `PLAIN` |
+| `wave_packet_descriptor_index` | UInt8 | Yes | Dictionary |
+| `waveform_data_offset` | UInt64 | Yes | `DELTA_BINARY_PACKED` |
+| `waveform_packet_size` | UInt32 | Yes | Dictionary |
+| `return_point_waveform_location`, `waveform_x_t`, `waveform_y_t`, `waveform_z_t` | Float32 | Yes | Dictionary |
+| `extra_bytes` | Binary | Yes | Dictionary |
+
+These are defaults for non-null values; dictionary encoding can fall back to `PLAIN`.
 
 The file's `point_cloud` Parquet key/value metadata is a JSON object:
 
@@ -60,7 +62,7 @@ The file's `point_cloud` Parquet key/value metadata is a JSON object:
 | `voxel_edge_ratio` | Edge-length ratio between adjacent LOD levels; the finest voxel edge is `max(scale)` |
 | `crs` | PROJJSON object, or `null` if the source has no CRS |
 
-The default layout is 262,144 points per Row Group and 8,192 rows per page. All columns use ZSTD (level 9 by default); XYZ and `waveform_data_offset` use `DELTA_BINARY_PACKED`, `intensity` uses dictionary encoding, and `gps_time` uses `PLAIN`. The converter accepts LAS 1.4 point formats 0–10, including LAZ compression. Multiple inputs must have the same scale, offset, point format, and CRS. Conversion holds the input points and attributes in memory; run `cargo run -p pcp-convert -- --help` for layout options.
+The default layout is 262,144 points per Row Group and 8,192 rows per page. All columns use ZSTD (level 9 by default). The converter accepts LAS 1.4 point formats 0–10, including LAZ compression. Multiple inputs must have the same scale, offset, point format, and CRS. Conversion holds the input points and attributes in memory; run `cargo run -p pcp-convert -- --help` for layout options.
 
 Absent optional attributes are null. `extra_bytes` stores raw per-point bytes, but VLR/EVLR records and waveform data bodies are not copied. The output is not a lossless archive of the original LAS/LAZ file.
 

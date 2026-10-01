@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "hyparquet": "1.29.2",
+    "hyparquet": "1.31.2",
     "hyparquet-compressors": "1.1.1",
     "zstddec": "^0.2.0"
   },
