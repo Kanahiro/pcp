@@ -1,9 +1,9 @@
 import type { QuantizedBounds, WorldBounds } from "@pointcloud-parquet/browser";
 import * as THREE from "three";
-import { ScreenSpaceMesh } from "../mesh/screen-space-mesh";
-import type { SurfaceSettings } from "../mesh/surface-representation";
 import { QuantizedPointMaterial } from "../point-material";
 import type { CloudDescription, RenderedChunk } from "../worker-protocol";
+import { AmbientOcclusion } from "./ambient-occlusion";
+import type { SurfaceSettings } from "./surface-settings";
 
 /** Owns GPU resources. It deliberately knows nothing about Parquet, queries, or LOD policy. */
 export class PointCloudRenderer {
@@ -11,7 +11,7 @@ export class PointCloudRenderer {
 
   private readonly objects = new Map<number, THREE.Points>();
   private readonly material: QuantizedPointMaterial;
-  private readonly screenMesh = new ScreenSpaceMesh();
+  private readonly ambientOcclusion = new AmbientOcclusion();
   private settings: SurfaceSettings;
 
   constructor(
@@ -75,28 +75,23 @@ export class PointCloudRenderer {
 
   resize(): void {
     this.material.viewportScale = this.renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
-    this.screenMesh.resize(this.renderer, this.settings.meshResolutionScale);
+    this.ambientOcclusion.resize(this.renderer);
   }
 
   render(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
     if (this.settings.representation === "normal") {
-      this.material.prepass = false;
       this.renderer.render(scene, camera);
       return;
     }
-    this.material.prepass = true;
-    const fullViewportScale = this.renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
-    this.material.viewportScale = fullViewportScale * this.settings.meshResolutionScale;
-    this.screenMesh.render(
+    this.ambientOcclusion.render(
       this.renderer,
       scene,
       camera,
       this.group,
-      this.settings.pointSize * this.settings.meshEdgeThreshold,
-      this.settings.meshResolutionScale,
+      this.settings.pointSize * this.settings.aoRadius,
+      this.settings.aoStrength,
+      this.settings.pointSize,
     );
-    this.material.prepass = false;
-    this.material.viewportScale = fullViewportScale;
   }
 
   indices(): number[] {
@@ -122,7 +117,7 @@ export class PointCloudRenderer {
   dispose(): void {
     for (const index of [...this.objects.keys()]) this.remove(index);
     this.material.dispose();
-    this.screenMesh.dispose();
+    this.ambientOcclusion.dispose();
     this.group.removeFromParent();
     this.invalidate();
   }
