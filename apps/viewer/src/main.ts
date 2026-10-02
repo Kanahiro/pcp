@@ -3,10 +3,10 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import "./style.css";
 import { BoundingBoxLayers } from "./bbox-layer";
-import type { SurfaceRepresentation, SurfaceSettings } from "./mesh/surface-representation";
 import type { ColorMode } from "./point-buffer";
 import { ParquetPointCloudReader } from "./reader/point-cloud-reader";
 import { PointCloudRenderer } from "./renderer/point-cloud-renderer";
+import type { SurfaceRepresentation, SurfaceSettings } from "./renderer/surface-settings";
 import { selectRowGroupsBySse, type SpatialSseSelection } from "./sse";
 import type { CloudDescription, RenderedChunk } from "./worker-protocol";
 
@@ -49,15 +49,20 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
           <fieldset>
             <legend>Surface</legend>
             <div class="segmented two-up" id="surface-mode">
-              <label><input type="radio" name="surface" value="normal" checked><span>Normal</span></label>
-              <label><input type="radio" name="surface" value="screen-mesh"><span>Screen mesh</span></label>
+              <label><input type="radio" name="surface" value="normal"><span>Normal</span></label>
+              <label><input type="radio" name="surface" value="ambient-occlusion" checked><span>Ambient occlusion</span></label>
             </div>
           </fieldset>
-          <div class="mesh-controls" id="mesh-controls" hidden>
-            <label for="mesh-edge">Maximum mesh edge</label>
+          <div class="ao-controls" id="ao-controls">
+            <label for="ao-radius">AO radius (× point size)</label>
             <div class="range-row">
-              <input id="mesh-edge" type="range" min="1" max="12" value="4" step="0.5" />
-              <output id="mesh-edge-value">4×</output>
+              <input id="ao-radius" type="range" min="1" max="12" value="5" step="0.5" />
+              <output id="ao-radius-value">5×</output>
+            </div>
+            <label for="ao-strength">AO strength</label>
+            <div class="range-row">
+              <input id="ao-strength" type="range" min="0" max="3" value="1.6" step="0.1" />
+              <output id="ao-strength-value">1.6</output>
             </div>
           </div>
           <label class="switch-row" for="auto-lod"><span><b>Automatic LOD</b><small>Per-Row Group geometric error</small></span><input id="auto-lod" type="checkbox" checked><i></i></label>
@@ -211,7 +216,8 @@ element<HTMLInputElement>("point-budget").addEventListener("input", () => {
 });
 element<HTMLInputElement>("point-size").addEventListener("input", updatePointSize);
 element<HTMLDivElement>("surface-mode").addEventListener("change", updateSurfaceMode);
-element<HTMLInputElement>("mesh-edge").addEventListener("input", updateSurfaceMode);
+element<HTMLInputElement>("ao-radius").addEventListener("input", updateSurfaceMode);
+element<HTMLInputElement>("ao-strength").addEventListener("input", updateSurfaceMode);
 element<HTMLDivElement>("color-mode").addEventListener("change", recolor);
 element<HTMLInputElement>("show-page-bounds").addEventListener("change", () => {
   void updateBoundingBoxes();
@@ -405,8 +411,9 @@ function updatePointSize(): void {
 
 function updateSurfaceMode(): void {
   const settings = surfaceSettings();
-  element<HTMLElement>("mesh-controls").hidden = settings.representation !== "screen-mesh";
-  element<HTMLOutputElement>("mesh-edge-value").value = `${settings.meshEdgeThreshold}×`;
+  element<HTMLElement>("ao-controls").hidden = settings.representation !== "ambient-occlusion";
+  element<HTMLOutputElement>("ao-radius-value").value = `${settings.aoRadius}×`;
+  element<HTMLOutputElement>("ao-strength-value").value = String(settings.aoStrength);
   pointCloudRenderer?.update(settings);
 }
 
@@ -417,10 +424,8 @@ function surfaceSettings(): SurfaceSettings {
   return {
     representation,
     pointSize: Number(element<HTMLInputElement>("point-size").value),
-    meshEdgeThreshold: Number(element<HTMLInputElement>("mesh-edge").value),
-    // Half resolution caps reconstruction at roughly one quarter of the
-    // viewport cells while preserving enough detail for visual comparison.
-    meshResolutionScale: 0.5,
+    aoRadius: Number(element<HTMLInputElement>("ao-radius").value),
+    aoStrength: Number(element<HTMLInputElement>("ao-strength").value),
   };
 }
 
